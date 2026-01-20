@@ -160,6 +160,11 @@ public Drive() {
         .withName("arcadeDrive");
   }
 
+  public Command tankDriveCommand(DoubleSupplier left, DoubleSupplier right) {
+    return run( () -> m_drive.tankDrive(left.getAsDouble(), right.getAsDouble()))
+        .withName("tankDrive");
+  }
+  
   /**
    * Returns a command that drives the robot forward a specified distance at a specified speed.
    *
