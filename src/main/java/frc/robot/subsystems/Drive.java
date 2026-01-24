@@ -26,6 +26,7 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 
 @Logged
 public class Drive extends SubsystemBase {
@@ -43,8 +44,14 @@ public class Drive extends SubsystemBase {
   // The left-side drive encoder
   private final RelativeEncoder m_leftEncoder;
   private final RelativeEncoder m_rightEncoder;
+// Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
+  private final SlewRateLimiter filter = new SlewRateLimiter(0.5);
+  private final SlewRateLimiter filter2 = new SlewRateLimiter(0.5);
 
-/*   private final Encoder m_leftEncoder =
+  private Double slewLimit1 = 0.5;
+  private Double slewLimit2 = 0.5;
+    private boolean curveDrive = true;
+  /*   private final Encoder m_leftEncoder =
       new Encoder(
           DriveConstants.kLeftEncoderPorts[0],
           DriveConstants.kLeftEncoderPorts[1],
@@ -147,18 +154,26 @@ public Drive() {
         DriveConstants.kTurnToleranceDeg, DriveConstants.kTurnRateToleranceDegPerS);
   }
 
-  /**
+  /** 
    * Returns a command that drives the robot with arcade controls.
    *
    * @param fwd the commanded forward movement
    * @param rot the commanded rotation
    */
-  public Command arcadeDriveCommand(DoubleSupplier fwd, DoubleSupplier rot) {
+  public Command arcadeDriveCommand(DoubleSupplier fwd, DoubleSupplier rot, boolean squareInput) {
     // A split-stick arcade command, with forward/backward controlled by the left
     // hand, and turning controlled by the right.
-    return run(() -> m_drive.arcadeDrive(fwd.getAsDouble(), rot.getAsDouble()))
+    if (curveDrive) {
+    return run(() -> m_drive.curvatureDrive( filter.calculate(fwd.getAsDouble()) , filter2.calculate(rot.getAsDouble()),
+      Math.abs(fwd.getAsDouble()) < 0.1 ))
         .withName("arcadeDrive");
-  }
+    } else {
+    return run(() -> m_drive.arcadeDrive( filter.calculate(fwd.getAsDouble()) , filter2.calculate(rot.getAsDouble()), squareInput))
+        .withName("arcadeDrive");
+    }
+
+    }
+  
 
   public Command tankDriveCommand(DoubleSupplier left, DoubleSupplier right) {
     return run( () -> m_drive.tankDrive(left.getAsDouble(), right.getAsDouble()))
@@ -208,4 +223,13 @@ public Drive() {
         .until(m_controller::atGoal)
         .finallyDo(() -> m_drive.arcadeDrive(0, 0));
   }
+
+  public Double getSlewForward() {
+    return slewLimit1;
+  }
+
+  public Double getSlewRotate() {
+    return slewLimit2;
+  }
+
 }

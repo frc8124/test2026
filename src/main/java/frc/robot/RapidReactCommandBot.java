@@ -56,11 +56,18 @@ public class RapidReactCommandBot {
     // Control the drive with split-stick arcade controls
     m_drive.setDefaultCommand(
         
-  //     m_drive.arcadeDriveCommand(
-  //          () -> -m_driverController.getLeftY(), () -> -m_driverController.getRightX())
-            
-    m_drive.tankDriveCommand( () -> -m_driverController.getLeftY() / 3, () -> -m_driverController.getRightY() / 3 )
-            );
+     m_drive.arcadeDriveCommand(  () -> -m_driverController.getLeftY() / 1.75, () -> -m_driverController.getRightX() / 1.1, false)
+     //m_drive.arcadeDriveCommand(  () -> {if (-m_driverController.getLeftY() >=0) {return Math.sqrt(-m_driverController.getLeftY() / 1.75);} else { return -1 * Math.sqrt(m_driverController.getLeftY() / 1.75);}} , () -> {if (-m_driverController.getLeftY() >=0) {return Math.sqrt(-m_driverController.getRightX() / 1.1);} else { return -1 * Math.sqrt(m_driverController.getRightX() / 1.1);}}) //square rooted traditional (I think this is a bad idea, but wesley wants it, so...)
+          //  m_drive.arcadeDriveCommand(() -> (m_driverController.getRightTriggerAxis() - m_driverController.getLeftTriggerAxis()), () -> -m_driverController.getLeftX()) // Trigger to go foreward or backward
+   // m_drive.tankDriveCommand( () -> -m_driverController.getLeftY() , () -> -m_driverController.getRightY()  ) //Tank drive, sometimes divide by 3
+           // m_drive.arcadeDriveCommand(  () -> -m_driverController.getLeftY() * Math.abs(m_driverController.getLeftY()),
+            // () -> -m_driverController.getRightX() * Math.abs(m_driverController.getRightX()))  //squared input traditional
+
+   
+   
+   
+   
+   );
 
 
 
@@ -93,5 +100,9 @@ public class RapidReactCommandBot {
     return m_drive
         .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)
         .withTimeout(AutoConstants.kTimeoutSeconds);
+  }
+
+  public Drive getDrive() {
+    return m_drive;
   }
 }
