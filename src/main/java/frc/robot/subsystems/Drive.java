@@ -46,7 +46,7 @@ public class Drive extends SubsystemBase {
   private final RelativeEncoder m_rightEncoder;
 // Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
   private final SlewRateLimiter filter = new SlewRateLimiter(0.5);
-  private final SlewRateLimiter filter2 = new SlewRateLimiter(0.5);
+  private final SlewRateLimiter filter2 = new SlewRateLimiter(1.0);
 
   private Double slewLimit1 = 0.5;
   private Double slewLimit2 = 0.5;

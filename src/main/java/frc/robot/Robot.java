@@ -4,7 +4,7 @@
 
 package frc.robot;
 
-import edu.wpi.first.epilogue.Epilogue;
+import edu.wpi.first.epilogue.EpilogueConfiguration;
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.wpilibj.DataLogManager;
 import edu.wpi.first.wpilibj.TimedRobot;
@@ -38,7 +38,7 @@ public class Robot extends TimedRobot {
 
     // Initialize data logging.
     DataLogManager.start();
-    Epilogue.bind(this);
+    //Epilogue.bind(this); please note that I haven't tried this code with this part commented out.
 
     // Connect to NetworkTables
     NetworkTableInstance inst = NetworkTableInstance.getDefault();
