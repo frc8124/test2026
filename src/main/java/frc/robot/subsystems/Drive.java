@@ -7,17 +7,15 @@ package frc.robot.subsystems;
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.math.controller.ProfiledPIDController;
-import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import com.revrobotics.spark.SparkBase;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.util.sendable.SendableRegistry;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
-import edu.wpi.first.wpilibj.Encoder;
-import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import frc.robot.Constants.DriveConstants;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
-import com.revrobotics.AbsoluteEncoder;
+
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkBase.PersistMode;
@@ -27,6 +25,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 @Logged
 public class Drive extends SubsystemBase {
@@ -72,15 +71,14 @@ public class Drive extends SubsystemBase {
           DriveConstants.kTurnP,
           DriveConstants.kTurnI,
           DriveConstants.kTurnD,
-          new TrapezoidProfile.Constraints(
+        new TrapezoidProfile.Constraints(
               DriveConstants.kMaxTurnRateDegPerS,
               DriveConstants.kMaxTurnAccelerationDegPerSSquared));
 
-              private final SimpleMotorFeedforward m_feedforward =
-      new SimpleMotorFeedforward(
-          DriveConstants.ksVolts,
-          DriveConstants.kvVoltSecondsPerDegree,
-          DriveConstants.kaVoltSecondsSquaredPerDegree);
+  // We'll use the SparkMax internal PID controllers for wheel velocity control.
+  // WPILib ProfiledPIDController is kept to generate the desired angular velocity
+  // (deg/s) setpoint from a motion profile; we convert that to wheel velocities
+  // and command the SparkMax controllers directly.
 
   /** Creates a new Drive subsystem. */
 @SuppressWarnings("removal")
@@ -107,6 +105,27 @@ public Drive() {
     globalConfig
         .smartCurrentLimit(50)
         .idleMode(IdleMode.kBrake);
+    
+  // Configure closed-loop PID and feedforward on the SparkMax devices. These
+  // values are applied to the SparkMax via the SparkMaxConfig so they persist
+  // on the device.
+  globalConfig.closedLoop.pid(
+    DriveConstants.kDriveP, DriveConstants.kDriveI, DriveConstants.kDriveD);
+  // Treat kDriveFF as the velocity feedforward (kV). Leave kS at 0.0.
+  globalConfig.closedLoop.feedForward.kS(0.0);
+  globalConfig.closedLoop.feedForward.kV(DriveConstants.kDriveFF);
+
+  // Configure encoder conversion factors so RelativeEncoder returns
+  // position in meters and velocity in meters/second. Account for gearbox
+  // reduction: encoders are on the motor (NEO) side, so one wheel rotation is
+  // (gearReduction) motor rotations.
+  double wheelCircumference = Math.PI * DriveConstants.kWheelDiameterMeters;
+  double posConv = wheelCircumference / DriveConstants.kDriveGearReduction; // meters per motor rotation
+  double velConv = posConv / 60.0; // meters per second per RPM
+  // Apply conversion factors to the SparkMax config so getPosition/getVelocity
+  // return meters and meters/second respectively.
+  globalConfig.encoder.positionConversionFactor((float) posConv);
+  globalConfig.encoder.velocityConversionFactor((float) velConv);
 
     // Apply the global config and invert since it is on the opposite side
     rightLeaderConfig
@@ -141,6 +160,9 @@ public Drive() {
     m_leftEncoder = m_leftLeader.getEncoder();
     m_rightEncoder = m_rightLeader.getEncoder();
 
+    // Closed-loop gains are applied above via SparkMaxConfig.closedLoop so no
+    // runtime setP/setI/setD calls are required here.
+
     
     // Sets the distance per pulse for the encoders
 //    m_leftEncoder.setDistancePerPulse(DriveConstants.kEncoderDistancePerPulse);
@@ -150,8 +172,8 @@ public Drive() {
     m_controller.enableContinuousInput(-180, 180);
     // Set the controller tolerance - the delta tolerance ensures the robot is stationary at the
     // setpoint before it is considered as having reached the reference
-    m_controller.setTolerance(
-        DriveConstants.kTurnToleranceDeg, DriveConstants.kTurnRateToleranceDegPerS);
+  m_controller.setTolerance(
+    DriveConstants.kTurnToleranceDeg, DriveConstants.kTurnRateToleranceDegPerS);
   }
 
   /** 
@@ -213,15 +235,46 @@ public Drive() {
   public Command turnToAngleCommand(double angleDeg) {
     return startRun(
             () -> m_controller.reset(m_gyro.getRotation2d().getDegrees()),
-            () ->
-                m_drive.arcadeDrive(
-                    0,
-                    m_controller.calculate(m_gyro.getRotation2d().getDegrees(), angleDeg)
-                        // Divide feedforward voltage by battery voltage to normalize it to [-1, 1]
-                        + m_feedforward.calculate(m_controller.getSetpoint().velocity)
-                            / RobotController.getBatteryVoltage()))
+            () -> {
+              // Get angular velocity setpoint from the profiled controller (deg/s)
+              double currentAngle = m_gyro.getRotation2d().getDegrees();
+              double angularSetpointDegPerS = m_controller.calculate(currentAngle, angleDeg);
+
+              // Convert robot angular velocity (deg/s) to wheel linear speed (m/s):
+              // omega_rad = deg/s * pi/180
+              double omegaRadPerS = angularSetpointDegPerS * Math.PI / 180.0;
+              double halfTrack = DriveConstants.kTrackwidthMeters / 2.0;
+              double wheelLinearSpeedMPerS = omegaRadPerS * halfTrack;
+
+              // Convert wheel linear speed to rotations per minute (RPM) for SparkMax setReference
+              double wheelCircumference = Math.PI * DriveConstants.kWheelDiameterMeters;
+              double rps = wheelLinearSpeedMPerS / wheelCircumference; // rotations per second
+              double rpm = rps * 60.0;
+
+              // Left and right wheel target RPMs: opposite signs for turning in place
+              double leftTargetRPM = -rpm;
+              double rightTargetRPM = rpm;
+
+              try {
+                m_leftLeader.getClosedLoopController().setSetpoint(
+                    leftTargetRPM, SparkBase.ControlType.kVelocity);
+                m_rightLeader.getClosedLoopController().setSetpoint(
+                    rightTargetRPM, SparkBase.ControlType.kVelocity);
+              } catch (Throwable t) {
+                // Fallback to arcadeDrive if SparkMax velocity API isn't available at runtime
+                m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg));
+              }
+            })
         .until(m_controller::atGoal)
-        .finallyDo(() -> m_drive.arcadeDrive(0, 0));
+        .finallyDo(() -> {
+          // Stop the SparkMax velocity controllers
+          try {
+            m_leftLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+            m_rightLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+          } catch (Throwable t) {
+            m_drive.arcadeDrive(0, 0);
+          }
+        });
   }
 
   public Double getSlewForward() {
@@ -230,6 +283,22 @@ public Drive() {
 
   public Double getSlewRotate() {
     return slewLimit2;
+  }
+
+  @Override
+  public void periodic() {
+    // Publish SparkMax encoder values to SmartDashboard for debugging/tuning
+    try {
+      SmartDashboard.putNumber("Drive/LeftEncoderPositionRotations", m_leftEncoder.getPosition());
+      SmartDashboard.putNumber("Drive/LeftEncoderVelocityRPM", m_leftEncoder.getVelocity());
+
+      SmartDashboard.putNumber("Drive/RightEncoderPositionRotations", m_rightEncoder.getPosition());
+      SmartDashboard.putNumber("Drive/RightEncoderVelocityRPM", m_rightEncoder.getVelocity());
+
+      SmartDashboard.putNumber("Drive/GyroAngleDeg", m_gyro.getRotation2d().getDegrees());
+    } catch (Throwable t) {
+      // If anything goes wrong (e.g., encoder not initialized yet), don't crash the robot code
+    }
   }
 
 }
