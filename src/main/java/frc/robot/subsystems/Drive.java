@@ -27,6 +27,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 
 @Logged
 public class Drive extends SubsystemBase {
@@ -161,6 +162,14 @@ public Drive() {
     m_leftEncoder = m_leftLeader.getEncoder();
     m_rightEncoder = m_rightLeader.getEncoder();
 
+    // Add the Drive subsystem to Shuffleboard so the sendable properties we expose
+    // (Slew Forward, Slew Rotate, Curve Drive) are editable at runtime.
+    try {
+      Shuffleboard.getTab("Drive").add("Drive Controls", this).withSize(2, 2).withPosition(0, 0);
+    } catch (Throwable t) {
+      // Ignore if Shuffleboard isn't available in this environment
+    }
+
     // Closed-loop gains are applied above via SparkMaxConfig.closedLoop so no
     // runtime setP/setI/setD calls are required here.
 
@@ -288,14 +297,20 @@ public Drive() {
 
   /** Set the forward slew limit (units per second). Recreates the internal limiter. */
   public void setSlewForward(double limit) {
-    this.slewLimit1 = limit;
-    this.filter = new SlewRateLimiter(this.slewLimit1);
+    double clamped = Math.max(DriveConstants.kSlewMin, Math.min(limit, DriveConstants.kSlewMax));
+    if (clamped != this.slewLimit1) {
+      this.slewLimit1 = clamped;
+      this.filter = new SlewRateLimiter(this.slewLimit1);
+    }
   }
 
   /** Set the rotation slew limit (units per second). Recreates the internal limiter. */
   public void setSlewRotate(double limit) {
-    this.slewLimit2 = limit;
-    this.filter2 = new SlewRateLimiter(this.slewLimit2);
+    double clamped = Math.max(DriveConstants.kSlewMin, Math.min(limit, DriveConstants.kSlewMax));
+    if (clamped != this.slewLimit2) {
+      this.slewLimit2 = clamped;
+      this.filter2 = new SlewRateLimiter(this.slewLimit2);
+    }
   }
 
   /** Enable or disable curvature (curve) drive mode. */

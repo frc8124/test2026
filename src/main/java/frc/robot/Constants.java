@@ -62,6 +62,10 @@ public final class Constants {
     // Gear reduction between motor and wheel (motor rotations per wheel rotation)
     // For example: an 8.46:1 reduction means 8.46 motor rotations = 1 wheel rotation
     public static final double kDriveGearReduction = 8.46;
+    // Allowed slew-rate limits (meters or unitless input per second). These bounds are
+    // used to clamp dashboard input to safe ranges.
+    public static final double kSlewMin = 0.0;
+    public static final double kSlewMax = 5.0;
   }
 
   public static final class ShooterConstants {
