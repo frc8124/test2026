@@ -10,6 +10,7 @@ import edu.wpi.first.math.controller.ProfiledPIDController;
 import com.revrobotics.spark.SparkBase;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.util.sendable.SendableRegistry;
+import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import frc.robot.Constants.DriveConstants;
@@ -277,11 +278,11 @@ public Drive() {
         });
   }
 
-  public Double getSlewForward() {
+  public double getSlewForward() {
     return slewLimit1;
   }
 
-  public Double getSlewRotate() {
+  public double getSlewRotate() {
     return slewLimit2;
   }
 
@@ -300,6 +301,20 @@ public Drive() {
   /** Enable or disable curvature (curve) drive mode. */
   public void setCurveDrive(boolean enabled) {
     this.curveDrive = enabled;
+  }
+
+  public boolean isCurveDrive() {
+    return this.curveDrive;
+  }
+
+  @Override
+  public void initSendable(SendableBuilder builder) {
+    super.initSendable(builder);
+    // Expose the slew limits and curveDrive toggle to Shuffleboard/SmartDashboard so
+    // they can be adjusted at runtime during teleop for tuning.
+    builder.addDoubleProperty("Slew Forward", this::getSlewForward, this::setSlewForward);
+    builder.addDoubleProperty("Slew Rotate", this::getSlewRotate, this::setSlewRotate);
+    builder.addBooleanProperty("Curve Drive", () -> this.curveDrive, this::setCurveDrive);
   }
 
   @Override
