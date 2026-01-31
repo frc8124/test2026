@@ -92,6 +92,12 @@ public class Drive extends SubsystemBase {
   private double kv = DriveConstants.kvVoltSecondsPerDegree;
   private double ka = DriveConstants.kaVoltSecondsSquaredPerDegree;
   private SimpleMotorFeedforward m_feedforward = new SimpleMotorFeedforward(ks, kv, ka);
+  // SparkMaxConfig instances created during construction — keep as fields so we can
+  // update controller parameters at runtime by modifying and reapplying these configs.
+  private SparkMaxConfig globalConfig;
+  private SparkMaxConfig rightLeaderConfig;
+  private SparkMaxConfig leftFollowerConfig;
+  private SparkMaxConfig rightFollowerConfig;
 
   // We'll use the SparkMax internal PID controllers for wheel velocity control.
   // WPILib ProfiledPIDController is kept to generate the desired angular velocity
@@ -117,10 +123,10 @@ public Drive() {
     SendableRegistry.addChild(m_drive, m_leftLeader);
     SendableRegistry.addChild(m_drive, m_rightLeader);
 
-    SparkMaxConfig globalConfig = new SparkMaxConfig();
-    SparkMaxConfig rightLeaderConfig = new SparkMaxConfig();
-    SparkMaxConfig leftFollowerConfig = new SparkMaxConfig();
-    SparkMaxConfig rightFollowerConfig = new SparkMaxConfig();
+  globalConfig = new SparkMaxConfig();
+  rightLeaderConfig = new SparkMaxConfig();
+  leftFollowerConfig = new SparkMaxConfig();
+  rightFollowerConfig = new SparkMaxConfig();
 
     /*
      * Set parameters that will apply to all SPARKs. We will also use this as
@@ -392,12 +398,21 @@ public Drive() {
 
   private void applyDriveClosedLoopConfig() {
     try {
-      SparkMaxConfig cfg = new SparkMaxConfig();
-      cfg.closedLoop.pid((float) driveP, (float) driveI, (float) driveD);
-      cfg.closedLoop.feedForward.kV((float) driveFF);
-      // Apply to leaders only; followers are configured to follow
-      m_leftLeader.configure(cfg, com.revrobotics.ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
-      m_rightLeader.configure(cfg, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+  // Update the existing config objects with the new PID/FF values and
+  // reapply them to the devices. This keeps other configuration fields
+  // (current limits, encoder conversions, inversion/follow) intact.
+  globalConfig.closedLoop.pid((float) driveP, (float) driveI, (float) driveD);
+  globalConfig.closedLoop.feedForward.kV((float) driveFF);
+
+  // Re-derive the per-device configs and reapply
+  rightLeaderConfig.apply(globalConfig);
+  leftFollowerConfig.apply(globalConfig);
+  rightFollowerConfig.apply(globalConfig);
+
+  m_leftLeader.configure(globalConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+  m_leftFollower.configure(leftFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+  m_rightLeader.configure(rightLeaderConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+  m_rightFollower.configure(rightFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     } catch (Throwable t) {
       // Ignore if configuration cannot be applied at runtime
     }
