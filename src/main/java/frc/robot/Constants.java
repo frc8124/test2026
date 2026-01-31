@@ -45,10 +45,23 @@ public final class Constants {
 
     public static final double kMaxTurnRateDegPerS = 100;
     public static final double kMaxTurnAccelerationDegPerSSquared = 300;
-
     public static final double ksVolts = 1;
     public static final double kvVoltSecondsPerDegree = 0.8;
     public static final double kaVoltSecondsSquaredPerDegree = 0.15;
+
+    // Distance between left and right wheels (track width) for Andymark 2024 Kitbot
+    // Approximate standard value in meters; tune for your robot.
+    public static final double kTrackwidthMeters = 0.69;
+
+    // Drive motor velocity PID (used for internal SparkMax PID tuning)
+    public static final double kDriveP = 0.1;
+    public static final double kDriveI = 0.0;
+    public static final double kDriveD = 0.0;
+    // Feedforward for SparkMax internal velocity controller (units depend on controller config)
+    public static final double kDriveFF = 0.0;
+    // Gear reduction between motor and wheel (motor rotations per wheel rotation)
+    // For example: an 8.46:1 reduction means 8.46 motor rotations = 1 wheel rotation
+    public static final double kDriveGearReduction = 8.46;
   }
 
   public static final class ShooterConstants {
