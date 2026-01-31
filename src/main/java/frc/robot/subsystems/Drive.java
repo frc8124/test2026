@@ -45,12 +45,12 @@ public class Drive extends SubsystemBase {
   private final RelativeEncoder m_leftEncoder;
   private final RelativeEncoder m_rightEncoder;
 // Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
-  private final SlewRateLimiter filter = new SlewRateLimiter(0.5);
-  private final SlewRateLimiter filter2 = new SlewRateLimiter(1.0);
+  private SlewRateLimiter filter = new SlewRateLimiter(0.5);
+  private SlewRateLimiter filter2 = new SlewRateLimiter(1.0);
 
-  private Double slewLimit1 = 0.5;
-  private Double slewLimit2 = 0.5;
-    private boolean curveDrive = true;
+  private double slewLimit1 = 0.5;
+  private double slewLimit2 = 1.0;
+  private boolean curveDrive = true;
   /*   private final Encoder m_leftEncoder =
       new Encoder(
           DriveConstants.kLeftEncoderPorts[0],
@@ -230,6 +230,23 @@ public Drive() {
 
   public Double getSlewRotate() {
     return slewLimit2;
+  }
+
+  /** Set the forward slew limit (units per second). Recreates the internal limiter. */
+  public void setSlewForward(double limit) {
+    this.slewLimit1 = limit;
+    this.filter = new SlewRateLimiter(this.slewLimit1);
+  }
+
+  /** Set the rotation slew limit (units per second). Recreates the internal limiter. */
+  public void setSlewRotate(double limit) {
+    this.slewLimit2 = limit;
+    this.filter2 = new SlewRateLimiter(this.slewLimit2);
+  }
+
+  /** Enable or disable curvature (curve) drive mode. */
+  public void setCurveDrive(boolean enabled) {
+    this.curveDrive = enabled;
   }
 
 }
