@@ -19,15 +19,16 @@ import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkMax;
-import com.revrobotics.spark.SparkBase.PersistMode;
-import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.PersistMode;
+import com.revrobotics.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj.motorcontrol.MotorController;
+import java.util.function.DoubleConsumer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 
 @Logged
@@ -54,7 +55,7 @@ public class Drive extends SubsystemBase {
   private double slewLimit2 = 1.0;
   private boolean curveDrive = true;
   private boolean usePidReference = false;
-  
+
   /*   private final Encoder m_leftEncoder =
       new Encoder(
           DriveConstants.kLeftEncoderPorts[0],
@@ -80,13 +81,25 @@ public class Drive extends SubsystemBase {
               DriveConstants.kMaxTurnRateDegPerS,
               DriveConstants.kMaxTurnAccelerationDegPerSSquared));
 
+  // Drive closed-loop / feedforward tunables (initialized from constants)
+  private double driveP = DriveConstants.kDriveP;
+  private double driveI = DriveConstants.kDriveI;
+  private double driveD = DriveConstants.kDriveD;
+  private double driveFF = DriveConstants.kDriveFF;
+
+  // Feedforward values used for the profiled turn feedforward calculation
+  private double ks = DriveConstants.ksVolts;
+  private double kv = DriveConstants.kvVoltSecondsPerDegree;
+  private double ka = DriveConstants.kaVoltSecondsSquaredPerDegree;
+  private SimpleMotorFeedforward m_feedforward = new SimpleMotorFeedforward(ks, kv, ka);
+
   // We'll use the SparkMax internal PID controllers for wheel velocity control.
   // WPILib ProfiledPIDController is kept to generate the desired angular velocity
   // (deg/s) setpoint from a motion profile; we convert that to wheel velocities
   // and command the SparkMax controllers directly.
 
   /** Creates a new Drive subsystem. */
-@SuppressWarnings("removal")
+
 public Drive() {
     m_leftLeader = new SparkMax(1, MotorType.kBrushless);
     m_leftFollower = new SparkMax(2, MotorType.kBrushless);
@@ -95,107 +108,11 @@ public Drive() {
 
   // Route DifferentialDrive outputs through wrapper methods so we can optionally
   // use the SparkMax closed-loop setpoint API (PID reference) instead of raw set().
-    // Create MotorController adapters that forward set() calls to our wrapper
-    // methods so we can optionally use the SparkMax closed-loop setpoint API.
-    MotorController leftAdapter = new MotorController() {
-      @Override
-      public void set(double speed) {
-        setLeftMotorOutput(speed);
-      }
-
-      @Override
-      public double get() {
-        try {
-          return m_leftLeader.get();
-        } catch (Throwable t) {
-          return 0.0;
-        }
-      }
-
-      @Override
-      public void setInverted(boolean isInverted) {
-        try {
-          m_leftLeader.setInverted(isInverted);
-        } catch (Throwable t) {
-        }
-      }
-
-      @Override
-      public boolean getInverted() {
-        try {
-          return m_leftLeader.getInverted();
-        } catch (Throwable t) {
-          return false;
-        }
-      }
-
-      @Override
-      public void disable() {
-        try {
-          m_leftLeader.disable();
-        } catch (Throwable t) {
-        }
-      }
-
-      @Override
-      public void stopMotor() {
-        try {
-          m_leftLeader.stopMotor();
-        } catch (Throwable t) {
-        }
-      }
-    };
-
-    MotorController rightAdapter = new MotorController() {
-      @Override
-      public void set(double speed) {
-        setRightMotorOutput(speed);
-      }
-
-      @Override
-      public double get() {
-        try {
-          return m_rightLeader.get();
-        } catch (Throwable t) {
-          return 0.0;
-        }
-      }
-
-      @Override
-      public void setInverted(boolean isInverted) {
-        try {
-          m_rightLeader.setInverted(isInverted);
-        } catch (Throwable t) {
-        }
-      }
-
-      @Override
-      public boolean getInverted() {
-        try {
-          return m_rightLeader.getInverted();
-        } catch (Throwable t) {
-          return false;
-        }
-      }
-
-      @Override
-      public void disable() {
-        try {
-          m_rightLeader.disable();
-        } catch (Throwable t) {
-        }
-      }
-
-      @Override
-      public void stopMotor() {
-        try {
-          m_rightLeader.stopMotor();
-        } catch (Throwable t) {
-        }
-      }
-    };
-
-    m_drive = new DifferentialDrive(leftAdapter, rightAdapter);
+      // Use DoubleConsumer wrappers so DifferentialDrive will call our
+      // setLeftMotorOutput/setRightMotorOutput methods without needing a MotorController adapter.
+      DoubleConsumer leftConsumer = (v) -> setLeftMotorOutput(v);
+      DoubleConsumer rightConsumer = (v) -> setRightMotorOutput(v);
+      m_drive = new DifferentialDrive(leftConsumer, rightConsumer);
 
     SendableRegistry.addChild(m_drive, m_leftLeader);
     SendableRegistry.addChild(m_drive, m_rightLeader);
@@ -436,6 +353,73 @@ public Drive() {
     return this.usePidReference;
   }
 
+  // Drive PID setters/getters
+  public double getDriveP() {
+    return this.driveP;
+  }
+
+  public void setDriveP(double p) {
+    this.driveP = p;
+    applyDriveClosedLoopConfig();
+  }
+
+  public double getDriveI() {
+    return this.driveI;
+  }
+
+  public void setDriveI(double i) {
+    this.driveI = i;
+    applyDriveClosedLoopConfig();
+  }
+
+  public double getDriveD() {
+    return this.driveD;
+  }
+
+  public void setDriveD(double d) {
+    this.driveD = d;
+    applyDriveClosedLoopConfig();
+  }
+
+  public double getDriveFF() {
+    return this.driveFF;
+  }
+
+  public void setDriveFF(double ff) {
+    this.driveFF = ff;
+    applyDriveClosedLoopConfig();
+  }
+
+  private void applyDriveClosedLoopConfig() {
+    try {
+      SparkMaxConfig cfg = new SparkMaxConfig();
+      cfg.closedLoop.pid((float) driveP, (float) driveI, (float) driveD);
+      cfg.closedLoop.feedForward.kV((float) driveFF);
+      // Apply to leaders only; followers are configured to follow
+      m_leftLeader.configure(cfg, com.revrobotics.ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      m_rightLeader.configure(cfg, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+    } catch (Throwable t) {
+      // Ignore if configuration cannot be applied at runtime
+    }
+  }
+
+  // Feedforward constants for profiled turn feedforward
+  public double getKs() { return ks; }
+  public void setKs(double v) {
+    this.ks = v;
+    this.m_feedforward = new SimpleMotorFeedforward(this.ks, this.kv, this.ka);
+  }
+  public double getKv() { return kv; }
+  public void setKv(double v) {
+    this.kv = v;
+    this.m_feedforward = new SimpleMotorFeedforward(this.ks, this.kv, this.ka);
+  }
+  public double getKa() { return ka; }
+  public void setKa(double v) {
+    this.ka = v;
+    this.m_feedforward = new SimpleMotorFeedforward(this.ks, this.kv, this.ka);
+  }
+
   // Wrapper called by the MotorController adapter for the left side. If
   // usePidReference is true we attempt to apply the value via the SparkMax
   // closed-loop setpoint API; otherwise we call set() directly.
@@ -473,6 +457,15 @@ public Drive() {
     builder.addDoubleProperty("Slew Rotate", this::getSlewRotate, this::setSlewRotate);
     builder.addBooleanProperty("Curve Drive", () -> this.curveDrive, this::setCurveDrive);
     builder.addBooleanProperty("Use PID Reference", this::isUsePidReference, this::setUsePidReference);
+    // Drive controller PID and feedforward tunables
+    builder.addDoubleProperty("Drive P", () -> this.driveP, this::setDriveP);
+    builder.addDoubleProperty("Drive I", () -> this.driveI, this::setDriveI);
+    builder.addDoubleProperty("Drive D", () -> this.driveD, this::setDriveD);
+    builder.addDoubleProperty("Drive FF", () -> this.driveFF, this::setDriveFF);
+    // Turn/feedforward constants
+    builder.addDoubleProperty("Feedforward kS", () -> this.ks, this::setKs);
+    builder.addDoubleProperty("Feedforward kV", () -> this.kv, this::setKv);
+    builder.addDoubleProperty("Feedforward kA", () -> this.ka, this::setKa);
   }
 
   @Override
