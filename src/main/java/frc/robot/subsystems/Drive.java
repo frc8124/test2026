@@ -23,6 +23,7 @@ import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj.motorcontrol.MotorController;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
 import edu.wpi.first.math.filter.SlewRateLimiter;
@@ -52,6 +53,8 @@ public class Drive extends SubsystemBase {
   private double slewLimit1 = 0.5;
   private double slewLimit2 = 1.0;
   private boolean curveDrive = true;
+  private boolean usePidReference = false;
+  
   /*   private final Encoder m_leftEncoder =
       new Encoder(
           DriveConstants.kLeftEncoderPorts[0],
@@ -90,7 +93,109 @@ public Drive() {
     m_rightLeader = new SparkMax(3, MotorType.kBrushless);
     m_rightFollower = new SparkMax(4, MotorType.kBrushless);
 
-    m_drive = new DifferentialDrive(m_leftLeader::set, m_rightLeader::set);
+  // Route DifferentialDrive outputs through wrapper methods so we can optionally
+  // use the SparkMax closed-loop setpoint API (PID reference) instead of raw set().
+    // Create MotorController adapters that forward set() calls to our wrapper
+    // methods so we can optionally use the SparkMax closed-loop setpoint API.
+    MotorController leftAdapter = new MotorController() {
+      @Override
+      public void set(double speed) {
+        setLeftMotorOutput(speed);
+      }
+
+      @Override
+      public double get() {
+        try {
+          return m_leftLeader.get();
+        } catch (Throwable t) {
+          return 0.0;
+        }
+      }
+
+      @Override
+      public void setInverted(boolean isInverted) {
+        try {
+          m_leftLeader.setInverted(isInverted);
+        } catch (Throwable t) {
+        }
+      }
+
+      @Override
+      public boolean getInverted() {
+        try {
+          return m_leftLeader.getInverted();
+        } catch (Throwable t) {
+          return false;
+        }
+      }
+
+      @Override
+      public void disable() {
+        try {
+          m_leftLeader.disable();
+        } catch (Throwable t) {
+        }
+      }
+
+      @Override
+      public void stopMotor() {
+        try {
+          m_leftLeader.stopMotor();
+        } catch (Throwable t) {
+        }
+      }
+    };
+
+    MotorController rightAdapter = new MotorController() {
+      @Override
+      public void set(double speed) {
+        setRightMotorOutput(speed);
+      }
+
+      @Override
+      public double get() {
+        try {
+          return m_rightLeader.get();
+        } catch (Throwable t) {
+          return 0.0;
+        }
+      }
+
+      @Override
+      public void setInverted(boolean isInverted) {
+        try {
+          m_rightLeader.setInverted(isInverted);
+        } catch (Throwable t) {
+        }
+      }
+
+      @Override
+      public boolean getInverted() {
+        try {
+          return m_rightLeader.getInverted();
+        } catch (Throwable t) {
+          return false;
+        }
+      }
+
+      @Override
+      public void disable() {
+        try {
+          m_rightLeader.disable();
+        } catch (Throwable t) {
+        }
+      }
+
+      @Override
+      public void stopMotor() {
+        try {
+          m_rightLeader.stopMotor();
+        } catch (Throwable t) {
+        }
+      }
+    };
+
+    m_drive = new DifferentialDrive(leftAdapter, rightAdapter);
 
     SendableRegistry.addChild(m_drive, m_leftLeader);
     SendableRegistry.addChild(m_drive, m_rightLeader);
@@ -322,6 +427,43 @@ public Drive() {
     return this.curveDrive;
   }
 
+  /** Toggle whether DifferentialDrive outputs use the SparkMax PID reference API. */
+  public void setUsePidReference(boolean use) {
+    this.usePidReference = use;
+  }
+
+  public boolean isUsePidReference() {
+    return this.usePidReference;
+  }
+
+  // Wrapper called by the MotorController adapter for the left side. If
+  // usePidReference is true we attempt to apply the value via the SparkMax
+  // closed-loop setpoint API; otherwise we call set() directly.
+  private void setLeftMotorOutput(double value) {
+    if (usePidReference) {
+      try {
+        m_leftLeader.getClosedLoopController().setSetpoint(value, SparkBase.ControlType.kDutyCycle);
+        return;
+      } catch (Throwable t) {
+        // fall through to percent output fallback
+      }
+    }
+    m_leftLeader.set(value);
+  }
+
+  // Wrapper called by the MotorController adapter for the right side.
+  private void setRightMotorOutput(double value) {
+    if (usePidReference) {
+      try {
+        m_rightLeader.getClosedLoopController().setSetpoint(value, SparkBase.ControlType.kDutyCycle);
+        return;
+      } catch (Throwable t) {
+        // fall through to percent output fallback
+      }
+    }
+    m_rightLeader.set(value);
+  }
+
   @Override
   public void initSendable(SendableBuilder builder) {
     super.initSendable(builder);
@@ -330,6 +472,7 @@ public Drive() {
     builder.addDoubleProperty("Slew Forward", this::getSlewForward, this::setSlewForward);
     builder.addDoubleProperty("Slew Rotate", this::getSlewRotate, this::setSlewRotate);
     builder.addBooleanProperty("Curve Drive", () -> this.curveDrive, this::setCurveDrive);
+    builder.addBooleanProperty("Use PID Reference", this::isUsePidReference, this::setUsePidReference);
   }
 
   @Override
