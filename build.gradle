@@ -3,6 +3,14 @@ plugins {
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
 }
 
+// Add Littleton Robotics' AdvantageKit maven repository so the AdvantageKit artifacts
+// (akit-java / akit-wpilibio) can be resolved. The vendordep `AdvantageKit.json`
+// suggests the following URL.
+repositories {
+    maven { url "https://frcmaven.wpi.edu/artifactory/littletonrobotics-mvn-release/" }
+    mavenCentral()
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -48,7 +56,10 @@ def deployArtifact = deploy.targets.roborio.artifacts.frcJava
 wpi.java.debugJni = false
 
 // Set this to true to enable desktop support.
-def includeDesktopSupport = false
+// Enable desktop support to allow running the robot code locally in simulation
+// (this builds the desktop/native WPILib JNI libraries). Set to true to run
+// the WPILib simulator on your PC.
+def includeDesktopSupport = true
 
 // Defining my dependencies. In this case, WPILib (+ friends), and vendor libraries.
 // Also defines JUnit 5.
@@ -56,7 +67,9 @@ dependencies {
     annotationProcessor wpi.java.deps.wpilibAnnotations()
     implementation wpi.java.deps.wpilib()
     implementation wpi.java.vendor.java()
-
+    // Use the AdvantageKit coordinates from the vendordep metadata and a
+    // Littleton Robotics repository (added above).
+    implementation 'org.littletonrobotics.akit:akit-java:26.0.0'
     roborioDebug wpi.java.deps.wpilibJniDebug(wpi.platforms.roborio)
     roborioDebug wpi.java.vendor.jniDebug(wpi.platforms.roborio)
 

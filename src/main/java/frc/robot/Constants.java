@@ -5,7 +5,6 @@
 package frc.robot;
 
 import edu.wpi.first.math.util.Units;
-
 /**
  * The Constants class provides a convenient place for teams to hold robot-wide numerical or boolean
  * constants. This class should not be used for any other purpose. All constants should be declared
@@ -25,7 +24,6 @@ public final class Constants {
     public static final int[] kRightEncoderPorts = {2, 3};
     public static final boolean kLeftEncoderReversed = false;
     public static final boolean kRightEncoderReversed = true;
-
     public static final int kEncoderCPR = 1024;
     public static final double kWheelDiameterMeters = Units.inchesToMeters(6);
     public static final double kEncoderDistancePerPulse =
