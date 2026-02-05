@@ -62,6 +62,19 @@ public final class Constants {
     // Gear reduction between motor and wheel (motor rotations per wheel rotation)
     // For example: an 8.46:1 reduction means 8.46 motor rotations = 1 wheel rotation
     public static final double kDriveGearReduction = 8.46;
+
+  // Nominal free speed of the drive motor (NEO) in RPM. Used for simple sim.
+  public static final double kMotorFreeSpeedRPM = 5676.0;
+
+  // Derived maximum linear speed (meters per second) at the wheel assuming free
+  // motor speed and the configured gear reduction. This is only a simple
+  // theoretical value and should be tuned/verified for simulation fidelity.
+  public static final double kMaxSpeedMetersPerSecond =
+    (kMotorFreeSpeedRPM / kDriveGearReduction) / 60.0 * (Math.PI * kWheelDiameterMeters);
+    // Slew-rate limiter rates (units: input units per second). These limit how
+    // quickly joystick inputs can change. Tune to taste.
+    public static final double kSlewRateForward = 3.0; // per second
+    public static final double kSlewRateRotate = 3.0; // per second
   }
 
   public static final class ShooterConstants {

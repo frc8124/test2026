@@ -10,9 +10,7 @@ import edu.wpi.first.wpilibj.DataLogManager;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.networktables.DoublePublisher;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableInstance;
+// NetworkTables not used right now
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -25,8 +23,7 @@ public class Robot extends TimedRobot {
 
   private final RapidReactCommandBot m_robot = new RapidReactCommandBot();
 
-  DoublePublisher forwardSlewPub;
-  DoublePublisher rotateSlewPub;
+  // slew rate publishers removed
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -41,16 +38,7 @@ public class Robot extends TimedRobot {
     //Epilogue.bind(this); please note that I haven't tried this code with this part commented out.
 
     // Connect to NetworkTables
-    NetworkTableInstance inst = NetworkTableInstance.getDefault();
-    // Get the table within that instance that contains the data. There can
-    // be as many tables as you like and exist to make it easier to organize
-    // your data. In this case, it's a table called datatable.
-    NetworkTable table = inst.getTable("datatable");
-    // Start publishing topics within that table that correspond to the X and Y values
-    // for some operation in your program.
-    // The topic names are actually "/datatable/x" and "/datatable/y".
-    forwardSlewPub = table.getDoubleTopic("forwardSlew").publish();
-    rotateSlewPub = table.getDoubleTopic("rotateSlew").publish();
+  // NetworkTableInstance not used currently (slew topics removed)
   }
 
   /**
@@ -111,8 +99,6 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
 
-    forwardSlewPub.set( m_robot.getDrive().getSlewForward() );
-    rotateSlewPub.set( m_robot.getDrive().getSlewRotate() );
   }
 
   @Override

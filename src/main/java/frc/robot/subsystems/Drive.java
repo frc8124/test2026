@@ -24,8 +24,19 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
-import edu.wpi.first.math.filter.SlewRateLimiter;
+// Slew rate limiters removed — direct joystick inputs are used now
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
+import com.revrobotics.spark.SparkClosedLoopController;
 
 @Logged
 public class Drive extends SubsystemBase {
@@ -43,13 +54,28 @@ public class Drive extends SubsystemBase {
   // The left-side drive encoder
   private final RelativeEncoder m_leftEncoder;
   private final RelativeEncoder m_rightEncoder;
-// Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
-  private final SlewRateLimiter filter = new SlewRateLimiter(0.5);
-  private final SlewRateLimiter filter2 = new SlewRateLimiter(1.0);
-
-  private Double slewLimit1 = 0.5;
-  private Double slewLimit2 = 0.5;
+  // Kinematics & odometry
+  private DifferentialDriveKinematics m_kinematics;
+  private DifferentialDriveOdometry m_odometry;
+  // Simulation state (simple kinematic sim)
+  private double m_simLeftPosition = 0.0; // meters
+  private double m_simRightPosition = 0.0; // meters
+  private double m_simHeading = 0.0; // radians
+  private double m_lastSimTimestamp = 0.0;
+  // WPILib drivetrain simulator (not constructed here to avoid cross-version
+  // constructor mismatches). If available in the environment, this can be
+  // created and used; for now we keep the simple integrator fallback.
+  private DifferentialDrivetrainSim m_driveSim = null;
+  private final Field2d m_field = new Field2d();
+  // (previously used slew rate limiters removed)
     private boolean curveDrive = true;
+
+  // Slew rate limiters for operator input
+  private final SlewRateLimiter m_slewForward;
+  private final SlewRateLimiter m_slewRotate;
+  // Track last limited values for telemetry/getters
+  private double m_lastSlewForward = 0.0;
+  private double m_lastSlewRotate = 0.0;
   /*   private final Encoder m_leftEncoder =
       new Encoder(
           DriveConstants.kLeftEncoderPorts[0],
@@ -160,6 +186,29 @@ public Drive() {
     m_leftEncoder = m_leftLeader.getEncoder();
     m_rightEncoder = m_rightLeader.getEncoder();
 
+  // Initialize sim state from encoders/gyro so simulation starts consistent
+  m_simLeftPosition = m_leftEncoder.getPosition();
+  m_simRightPosition = m_rightEncoder.getPosition();
+  m_simHeading = m_gyro.getRotation2d().getRadians();
+  m_lastSimTimestamp = Timer.getFPGATimestamp();
+
+  // Publish Field2d so dashboards (Glass/Shuffleboard) can display robot pose
+  SmartDashboard.putData("Field", m_field);
+
+  // Initialize kinematics and odometry (encoders configured to meters/m/s)
+    m_kinematics = new DifferentialDriveKinematics(DriveConstants.kTrackwidthMeters);
+    m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
+
+  // Initialize slew rate limiters
+  m_slewForward = new SlewRateLimiter(DriveConstants.kSlewRateForward);
+  m_slewRotate = new SlewRateLimiter(DriveConstants.kSlewRateRotate);
+
+  // Initialize simple sim state from encoders/gyro so simulation starts consistent
+  m_simLeftPosition = m_leftEncoder.getPosition();
+  m_simRightPosition = m_rightEncoder.getPosition();
+  m_simHeading = m_gyro.getRotation2d().getRadians();
+  m_lastSimTimestamp = Timer.getFPGATimestamp();
+
     // Closed-loop gains are applied above via SparkMaxConfig.closedLoop so no
     // runtime setP/setI/setD calls are required here.
 
@@ -186,20 +235,40 @@ public Drive() {
     // A split-stick arcade command, with forward/backward controlled by the left
     // hand, and turning controlled by the right.
     if (curveDrive) {
-    return run(() -> m_drive.curvatureDrive( filter.calculate(fwd.getAsDouble()) , filter2.calculate(rot.getAsDouble()),
-      Math.abs(fwd.getAsDouble()) < 0.1 ))
-        .withName("arcadeDrive");
+      return run(() -> {
+        double rawF = fwd.getAsDouble();
+        double rawR = rot.getAsDouble();
+        double f = m_slewForward.calculate(rawF);
+        double r = m_slewRotate.calculate(rawR);
+        m_lastSlewForward = f;
+        m_lastSlewRotate = r;
+        m_drive.curvatureDrive(f, r, Math.abs(f) < 0.1);
+      }).withName("arcadeDrive");
     } else {
-    return run(() -> m_drive.arcadeDrive( filter.calculate(fwd.getAsDouble()) , filter2.calculate(rot.getAsDouble()), squareInput))
-        .withName("arcadeDrive");
+      return run(() -> {
+        double rawF = fwd.getAsDouble();
+        double rawR = rot.getAsDouble();
+        double f = m_slewForward.calculate(rawF);
+        double r = m_slewRotate.calculate(rawR);
+        m_lastSlewForward = f;
+        m_lastSlewRotate = r;
+        m_drive.arcadeDrive(f, r, squareInput);
+      }).withName("arcadeDrive");
     }
 
     }
   
 
   public Command tankDriveCommand(DoubleSupplier left, DoubleSupplier right) {
-    return run( () -> m_drive.tankDrive(left.getAsDouble(), right.getAsDouble()))
-        .withName("tankDrive");
+    return run(() -> {
+      double lf = left.getAsDouble();
+      double rf = right.getAsDouble();
+      double l = m_slewForward.calculate(lf);
+      double r = m_slewForward.calculate(rf);
+          m_lastSlewForward = (Math.abs(l) > Math.abs(m_lastSlewForward)) ? l : m_lastSlewForward;
+      m_drive.tankDrive(l, r);
+    })
+    .withName("tankDrive");
   }
   
   /**
@@ -246,20 +315,18 @@ public Drive() {
               double halfTrack = DriveConstants.kTrackwidthMeters / 2.0;
               double wheelLinearSpeedMPerS = omegaRadPerS * halfTrack;
 
-              // Convert wheel linear speed to rotations per minute (RPM) for SparkMax setReference
-              double wheelCircumference = Math.PI * DriveConstants.kWheelDiameterMeters;
-              double rps = wheelLinearSpeedMPerS / wheelCircumference; // rotations per second
-              double rpm = rps * 60.0;
-
-              // Left and right wheel target RPMs: opposite signs for turning in place
-              double leftTargetRPM = -rpm;
-              double rightTargetRPM = rpm;
+              // SparkMax closed-loop velocity control expects the same units as the
+              // encoder velocity conversion factor. We configured the encoder
+              // velocityConversionFactor to return meters/second, so pass the
+              // wheel linear speed (m/s) directly.
+              double leftTargetMps = -wheelLinearSpeedMPerS;
+              double rightTargetMps = wheelLinearSpeedMPerS;
 
               try {
                 m_leftLeader.getClosedLoopController().setSetpoint(
-                    leftTargetRPM, SparkBase.ControlType.kVelocity);
+                    leftTargetMps, SparkBase.ControlType.kVelocity);
                 m_rightLeader.getClosedLoopController().setSetpoint(
-                    rightTargetRPM, SparkBase.ControlType.kVelocity);
+                    rightTargetMps, SparkBase.ControlType.kVelocity);
               } catch (Throwable t) {
                 // Fallback to arcadeDrive if SparkMax velocity API isn't available at runtime
                 m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg));
@@ -267,38 +334,177 @@ public Drive() {
             })
         .until(m_controller::atGoal)
         .finallyDo(() -> {
-          // Stop the SparkMax velocity controllers
-          try {
-            m_leftLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
-            m_rightLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
-          } catch (Throwable t) {
-            m_drive.arcadeDrive(0, 0);
-          }
+            // Stop the SparkMax velocity controllers (pass 0 m/s)
+            try {
+              m_leftLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+              m_rightLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+            } catch (Throwable t) {
+              m_drive.arcadeDrive(0, 0);
+            }
         });
   }
 
-  public Double getSlewForward() {
-    return slewLimit1;
-  }
-
-  public Double getSlewRotate() {
-    return slewLimit2;
-  }
+  // Slew getters removed
 
   @Override
   public void periodic() {
     // Publish SparkMax encoder values to SmartDashboard for debugging/tuning
     try {
-      SmartDashboard.putNumber("Drive/LeftEncoderPositionRotations", m_leftEncoder.getPosition());
-      SmartDashboard.putNumber("Drive/LeftEncoderVelocityRPM", m_leftEncoder.getVelocity());
+      // Encoders are configured to return meters and meters/second
+      SmartDashboard.putNumber("Drive/LeftEncoderPositionMeters", m_leftEncoder.getPosition());
+      SmartDashboard.putNumber("Drive/LeftEncoderVelocityMPS", m_leftEncoder.getVelocity());
 
-      SmartDashboard.putNumber("Drive/RightEncoderPositionRotations", m_rightEncoder.getPosition());
-      SmartDashboard.putNumber("Drive/RightEncoderVelocityRPM", m_rightEncoder.getVelocity());
+      SmartDashboard.putNumber("Drive/RightEncoderPositionMeters", m_rightEncoder.getPosition());
+      SmartDashboard.putNumber("Drive/RightEncoderVelocityMPS", m_rightEncoder.getVelocity());
 
       SmartDashboard.putNumber("Drive/GyroAngleDeg", m_gyro.getRotation2d().getDegrees());
     } catch (Throwable t) {
       // If anything goes wrong (e.g., encoder not initialized yet), don't crash the robot code
     }
+    // Update odometry with current gyro angle and encoder distances (meters)
+    try {
+      m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
+      var pose = m_odometry.getPoseMeters();
+      SmartDashboard.putNumber("Drive/PoseX", pose.getX());
+      SmartDashboard.putNumber("Drive/PoseY", pose.getY());
+      SmartDashboard.putNumber("Drive/PoseHeadingDeg", pose.getRotation().getDegrees());
+      // Update Field2d robot pose for dashboards
+      try {
+        m_field.setRobotPose(pose);
+      } catch (Throwable t) {
+        // ignore if not in simulation/dashboard environment
+      }
+    } catch (Throwable t) {
+      // ignore
+    }
+  }
+
+  @Override
+  public void simulationPeriodic() {
+    // Simple kinematic simulation to update encoder positions and odometry.
+    double now = Timer.getFPGATimestamp();
+    double dt = now - m_lastSimTimestamp;
+    if (dt <= 0) {
+      dt = 0.02; // fallback
+    }
+    m_lastSimTimestamp = now;
+
+    try {
+      // If a DifferentialDrivetrainSim was constructed (environment-specific),
+      // use it. Otherwise fall back to the simple integrator used previously.
+      SparkClosedLoopController leftCLC = m_leftLeader.getClosedLoopController();
+      SparkClosedLoopController rightCLC = m_rightLeader.getClosedLoopController();
+
+      if (m_driveSim != null) {
+        // Convert control state to voltages that the sim can consume.
+        double leftVolts;
+        if (leftCLC.getControlType() == SparkBase.ControlType.kVelocity) {
+          double leftSetpoint = leftCLC.getSetpoint(); // m/s
+          leftVolts = (leftSetpoint / DriveConstants.kMaxSpeedMetersPerSecond) * RobotController.getBatteryVoltage();
+        } else {
+          leftVolts = m_leftLeader.get() * RobotController.getBatteryVoltage();
+        }
+
+        double rightVolts;
+        if (rightCLC.getControlType() == SparkBase.ControlType.kVelocity) {
+          double rightSetpoint = rightCLC.getSetpoint();
+          rightVolts = (rightSetpoint / DriveConstants.kMaxSpeedMetersPerSecond) * RobotController.getBatteryVoltage();
+        } else {
+          rightVolts = m_rightLeader.get() * RobotController.getBatteryVoltage();
+        }
+
+        // Step the drivetrain sim and read out wheel positions/velocities
+        m_driveSim.setInputs(leftVolts, rightVolts);
+        m_driveSim.update(dt);
+
+  double leftPos = m_driveSim.getLeftPositionMeters();
+  double rightPos = m_driveSim.getRightPositionMeters();
+  m_leftEncoder.setPosition(leftPos);
+  m_rightEncoder.setPosition(rightPos);
+
+        // Update odometry using simulated pose
+        try {
+          var pose = m_driveSim.getPose();
+          m_odometry.update(pose.getRotation(), leftPos, rightPos);
+          m_field.setRobotPose(m_odometry.getPoseMeters());
+        } catch (Throwable t) {
+          // ignore if sim methods aren't available in this environment
+        }
+      } else {
+        // Left velocity (m/s) - fallback simple integrator
+        double leftVel;
+        if (leftCLC.getControlType() == SparkBase.ControlType.kVelocity) {
+          // setpoint is in the same units as encoder velocity conversion (m/s)
+          leftVel = leftCLC.getSetpoint();
+        } else {
+          // Open-loop: approximate using duty cycle scaled by battery voltage
+          leftVel = m_leftLeader.get() * DriveConstants.kMaxSpeedMetersPerSecond * (RobotController.getBatteryVoltage() / 12.0);
+        }
+
+        double rightVel;
+        if (rightCLC.getControlType() == SparkBase.ControlType.kVelocity) {
+          rightVel = rightCLC.getSetpoint();
+        } else {
+          rightVel = m_rightLeader.get() * DriveConstants.kMaxSpeedMetersPerSecond * (RobotController.getBatteryVoltage() / 12.0);
+        }
+
+        // Integrate positions
+        m_simLeftPosition += leftVel * dt;
+        m_simRightPosition += rightVel * dt;
+
+        // Update heading (radians)
+        double deltaTheta = (rightVel - leftVel) / DriveConstants.kTrackwidthMeters * dt;
+        m_simHeading += deltaTheta;
+
+        // Feed back to SparkMax encoders (we configured encoder position to meters)
+        m_leftEncoder.setPosition(m_simLeftPosition);
+        m_rightEncoder.setPosition(m_simRightPosition);
+
+        
+        // Update odometry using simulated gyro/encoders
+        m_odometry.update(new Rotation2d(m_simHeading), m_simLeftPosition, m_simRightPosition);
+        // Update Field2d (simulation)
+        try {
+          m_field.setRobotPose(m_odometry.getPoseMeters());
+        } catch (Throwable t) {
+          // ignore
+        }
+      }
+    } catch (Throwable t) {
+      // Ignore simulation failures in non-sim environments
+    }
+  }
+
+  /** Returns the current robot pose as estimated by odometry. */
+  public Pose2d getPose() {
+    return m_odometry.getPoseMeters();
+  }
+
+  /** Returns the current wheel speeds (meters per second). */
+  public DifferentialDriveWheelSpeeds getWheelSpeeds() {
+    return new DifferentialDriveWheelSpeeds(m_leftEncoder.getVelocity(), m_rightEncoder.getVelocity());
+  }
+
+  /** Reset odometry to zero pose and zero the encoders. */
+  public void resetOdometry() {
+    try {
+      m_leftEncoder.setPosition(0);
+      m_rightEncoder.setPosition(0);
+      // Reset odometry by recreating the object with zeroed distances
+      m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), 0.0, 0.0);
+    } catch (Throwable t) {
+      // ignore
+    }
+  }
+
+  /** Returns the last-limited forward value from the slew limiter (for telemetry). */
+  public double getSlewForward() {
+    return m_lastSlewForward;
+  }
+
+  /** Returns the last-limited rotate value from the slew limiter (for telemetry). */
+  public double getSlewRotate() {
+    return m_lastSlewRotate;
   }
 
 }
