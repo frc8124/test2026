@@ -541,20 +541,14 @@ public class Drive extends SubsystemBase {
         m_rightEncoder.setPosition(rightPos);
 
         // Update gyro simulation and odometry using simulated pose
+        var pose = m_driveSim.getPose();
+        // Update ADXRS450 gyro sim with the simulated heading so other code
+        // reading the gyro sees the same value.
         try {
-          var pose = m_driveSim.getPose();
-          // Update ADXRS450 gyro sim with the simulated heading so other code
-          // reading the gyro sees the same value.
-          try {
-            ADXRS450_GyroSim gs = new ADXRS450_GyroSim(m_gyro);
-            gs.setAngle(pose.getRotation().getDegrees());
-          } catch (Throwable ignored) {}
+          ADXRS450_GyroSim gs = new ADXRS450_GyroSim(m_gyro);
+          gs.setAngle(pose.getRotation().getDegrees());
+        } catch (Throwable ignored) {}
 
-          m_odometry.update(pose.getRotation(), leftPos, rightPos);
-          m_field.setRobotPose(m_odometry.getPoseMeters());
-        } catch (Throwable t) {
-          // ignore if sim methods aren't available in this environment
-        }
       } else {
         // Left velocity (m/s) - fallback simple integrator
         double leftVel;
