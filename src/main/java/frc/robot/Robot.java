@@ -3,14 +3,16 @@
 // the WPILib BSD license file in the root directory of this project.
 
 package frc.robot;
-
+import org.littletonrobotics.junction.LoggedRobot;
+import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.epilogue.EpilogueConfiguration;
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.wpilibj.DataLogManager;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-// NetworkTables not used right now
+import org.littletonrobotics.junction.networktables.NT4Publisher;
+// NetworkTables publishers for slew rates were removed — no runtime publishing needed
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -18,12 +20,11 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
  * this project, you must also update the Main.java file in the project.
  */
 @Logged(name = "Rapid React Command Robot")
-public class Robot extends TimedRobot {
+public class Robot extends LoggedRobot {
   private Command m_autonomousCommand;
 
   private final RapidReactCommandBot m_robot = new RapidReactCommandBot();
 
-  // slew rate publishers removed
 
   /**
    * This function is run when the robot is first started up and should be used for any
@@ -31,14 +32,27 @@ public class Robot extends TimedRobot {
    */
   public Robot() {
     // Configure default commands and condition bindings on robot startup
-    m_robot.configureBindings();
-
+    //m_robot.configureBindings();
+    //Logger.startReplay("/home/lvuser/logs/replay.wpilog"); // Adjust path as needed
+    // Initialize data logging.
+    //DataLogManager.start();
+    //Epilogue.bind(this); please note that I haven't tried this code with this part commented out.
+      m_robot.configureBindings();
+    // Start the junction logger (use the instance API; startReplay(String) does not exist)
+    //Logger.getInstance().start();
     // Initialize data logging.
     DataLogManager.start();
-    //Epilogue.bind(this); please note that I haven't tried this code with this part commented out.
+      try {
+        // AdvantageKit's Logger uses static APIs in this version.
+        // Add NT4 publisher for live streaming to AdvantageScope and start the logger.
+        Logger.addDataReceiver(new NT4Publisher());
+        Logger.start();
+      } catch (Throwable t) {
+      // If AdvantageKit isn't on the classpath or fails at runtime, fall back to file logging onl    
+    }
 
-    // Connect to NetworkTables
-  // NetworkTableInstance not used currently (slew topics removed)
+
+  // No NetworkTables publishers for slew rates — values are exposed via Sendables on the Drive subsystem
   }
 
   /**
@@ -99,6 +113,7 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
 
+    // Slew-rate values are published via the Drive subsystem Sendables; no per-loop NetworkTables publishes required here.
   }
 
   @Override
