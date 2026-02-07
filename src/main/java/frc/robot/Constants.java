@@ -15,10 +15,10 @@ import edu.wpi.first.math.util.Units;
  */
 public final class Constants {
   public static final class DriveConstants {
-    public static final int kLeftMotor1Port = 0;
-    public static final int kLeftMotor2Port = 1;
-    public static final int kRightMotor1Port = 2;
-    public static final int kRightMotor2Port = 3;
+    public static final int kLeftMotor1ID = 1;
+    public static final int kLeftMotor2ID = 2;
+    public static final int kRightMotor1ID = 3;
+    public static final int kRightMotor2ID = 4;
 
     public static final int[] kLeftEncoderPorts = {0, 1};
     public static final int[] kRightEncoderPorts = {2, 3};
@@ -73,6 +73,9 @@ public final class Constants {
     // quickly joystick inputs can change. Tune to taste.
     public static final double kSlewRateForward = 3.0; // per second
     public static final double kSlewRateRotate = 3.0; // per second
+    // Allowed range for slew-rate limiter configuration
+    public static final double kSlewMin = 0.0;
+    public static final double kSlewMax = 10.0;
   }
 
   public static final class ShooterConstants {

@@ -2,6 +2,7 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import com.revrobotics.spark.SparkBase;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
@@ -34,6 +35,8 @@ import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.simulation.ADXRS450_GyroSim;
 import com.revrobotics.spark.SparkClosedLoopController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
@@ -41,95 +44,23 @@ import edu.wpi.first.wpilibj.RobotBase;
 
 @Logged
 public class Drive extends SubsystemBase {
-  // Adapter interfaces to decouple code from real vendor APIs for simulation.
-  private interface EncoderAdapter {
-    double getPosition();
-    double getVelocity();
-    void setPosition(double pos);
-  }
-
-  private interface ClosedLoopAdapter {
-    void setSetpoint(double value, Object controlType);
-  }
-
-  private interface MotorAdapter {
-    void set(double v);
-    EncoderAdapter getEncoder();
-    ClosedLoopAdapter getClosedLoopController();
-    void configure(SparkMaxConfig cfg, ResetMode resetMode, PersistMode persistMode);
-    boolean isReal(); // true if wraps a real SparkMax
-    SparkMax getWrappedSparkMax(); // may return null for sim
-  }
-
-  // Real motor wrapper that delegates to SparkMax (used when running on real robot and vendordeps present)
-  private static class RealMotorAdapter implements MotorAdapter {
-    private final SparkMax spark;
-    RealMotorAdapter(SparkMax s) { this.spark = s; }
-    @Override public void set(double v) { spark.set(v); }
-    @Override public EncoderAdapter getEncoder() {
-      RelativeEncoder e = spark.getEncoder();
-      return new EncoderAdapter() {
-        @Override public double getPosition() { return e.getPosition(); }
-        @Override public double getVelocity() { return e.getVelocity(); }
-        @Override public void setPosition(double pos) { e.setPosition(pos); }
-      };
-    }
-    @Override public ClosedLoopAdapter getClosedLoopController() {
-      final var cl = spark.getClosedLoopController();
-      return (value, controlType) -> {
-        try {
-          // Expect controlType to be SparkBase.ControlType
-          cl.setSetpoint(value, (SparkBase.ControlType) controlType);
-        } catch (Throwable t) {
-          // ignore in case of incompatible runtime
-        }
-      };
-    }
-    @Override public void configure(SparkMaxConfig cfg, ResetMode resetMode, PersistMode persistMode) {
-      spark.configure(cfg, resetMode, persistMode);
-    }
-    @Override public boolean isReal() { return true; }
-    @Override public SparkMax getWrappedSparkMax() { return spark; }
-  }
-
-  // Lightweight software simulation adapter used when running in simulation (no vendor sim dependency required).
-  private static class SimMotorAdapter implements MotorAdapter {
-    private final SimEncoder enc = new SimEncoder();
-    private double output = 0.0;
-    @Override public void set(double v) { this.output = v; /* simple model: velocity proportional to output */ enc.velocity = v * 100.0; }
-    @Override public EncoderAdapter getEncoder() { return enc; }
-    @Override public ClosedLoopAdapter getClosedLoopController() {
-      return (value, controlType) -> {
-        // very small simulated effect: treat value as velocity or duty cycle depending on controlType name if available
-        enc.velocity = value;
-      };
-    }
-    @Override public void configure(SparkMaxConfig cfg, ResetMode resetMode, PersistMode persistMode) { /* no-op in sim */ }
-    @Override public boolean isReal() { return false; }
-    @Override public SparkMax getWrappedSparkMax() { return null; }
-
-    private static class SimEncoder implements EncoderAdapter {
-      private double position = 0.0; // rotations or meters depending on how used
-      private double velocity = 0.0; // RPM or m/s-ish depending
-      @Override public double getPosition() { return position; }
-      @Override public double getVelocity() { return velocity; }
-      @Override public void setPosition(double pos) { this.position = pos; }
-    }
-  }
+  // Using vendor SparkMax objects directly; vendor simulation support will be
+  // relied on when running in simulation. This removes the previous adapter
+  // shim code and simplifies the subsystem.
 
   // The motors on the left side of the drive.
-  private final MotorAdapter m_leftLeader;
-  private final MotorAdapter m_leftFollower;
-  private final MotorAdapter m_rightLeader;
-  private final MotorAdapter m_rightFollower;
+  private final SparkMax m_leftLeader;
+  private final SparkMax m_leftFollower;
+  private final SparkMax m_rightLeader;
+  private final SparkMax m_rightFollower;
 
   // The robot's drive
   @NotLogged // Would duplicate motor data, there's no point sending it twice
   private final DifferentialDrive m_drive;
 
   // The left-side drive encoder
-  private final EncoderAdapter m_leftEncoder;
-  private final EncoderAdapter m_rightEncoder;
+  private final RelativeEncoder m_leftEncoder;
+  private final RelativeEncoder m_rightEncoder;
 
   // Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
   private SlewRateLimiter filter = new SlewRateLimiter(0.5);
@@ -203,34 +134,13 @@ public class Drive extends SubsystemBase {
   private SparkMaxConfig rightFollowerConfig;
 
   public Drive() {
-    // Create real adapters if running on robot and vendor libs available; otherwise create simulation adapters.
-    MotorAdapter leftL = null, leftF = null, rightL = null, rightF = null;
-    try {
-      if (RobotBase.isReal()) {
-        // real robot: construct actual SparkMax instances and wrap them
-        leftL = new RealMotorAdapter(new SparkMax(1, MotorType.kBrushless));
-        leftF = new RealMotorAdapter(new SparkMax(2, MotorType.kBrushless));
-        rightL = new RealMotorAdapter(new SparkMax(3, MotorType.kBrushless));
-        rightF = new RealMotorAdapter(new SparkMax(4, MotorType.kBrushless));
-      } else {
-        // simulation: use lightweight adapters (no vendor simulation dependency required)
-        leftL = new SimMotorAdapter();
-        leftF = new SimMotorAdapter();
-        rightL = new SimMotorAdapter();
-        rightF = new SimMotorAdapter();
-      }
-    } catch (Throwable t) {
-      // Fallback to simulation adapters if any vendor construction fails
-      leftL = new SimMotorAdapter();
-      leftF = new SimMotorAdapter();
-      rightL = new SimMotorAdapter();
-      rightF = new SimMotorAdapter();
-    }
-
-    m_leftLeader = leftL;
-    m_leftFollower = leftF;
-    m_rightLeader = rightL;
-    m_rightFollower = rightF;
+    // Construct vendor SparkMax motor controllers directly. The vendor-provided
+    // simulation support will be active when running in simulation, so there's
+    // no need for a separate adapter shim.
+    m_leftLeader = new SparkMax(DriveConstants.kLeftMotor1ID, MotorType.kBrushless);
+    m_leftFollower = new SparkMax(DriveConstants.kLeftMotor2ID, MotorType.kBrushless);
+    m_rightLeader = new SparkMax(DriveConstants.kRightMotor1ID, MotorType.kBrushless);
+    m_rightFollower = new SparkMax(DriveConstants.kRightMotor2ID, MotorType.kBrushless);
 
     // Route DifferentialDrive outputs through wrapper methods so we can optionally
     // use the SparkMax closed-loop setpoint API (PID reference) instead of raw set().
@@ -238,14 +148,10 @@ public class Drive extends SubsystemBase {
     DoubleConsumer rightConsumer = (v) -> setRightMotorOutput(v);
     m_drive = new DifferentialDrive(leftConsumer, rightConsumer);
 
-    // If we have real SparkMax instances, add them as children for SendableRegistry.
+    // Register SparkMaxes as sendable children for dashboards
     try {
-      if (m_leftLeader.isReal()) {
-        SendableRegistry.addChild(m_drive, m_leftLeader.getWrappedSparkMax());
-      }
-      if (m_rightLeader.isReal()) {
-        SendableRegistry.addChild(m_drive, m_rightLeader.getWrappedSparkMax());
-      }
+      SendableRegistry.addChild(m_drive, m_leftLeader);
+      SendableRegistry.addChild(m_drive, m_rightLeader);
     } catch (Throwable ignored) {}
 
     globalConfig = new SparkMaxConfig();
@@ -272,20 +178,23 @@ public class Drive extends SubsystemBase {
         .apply(globalConfig)
         .inverted(true);
 
-    leftFollowerConfig
-        .apply(globalConfig)
-        .follow(m_leftLeader.isReal() ? m_leftLeader.getWrappedSparkMax() : null);
-
-    rightFollowerConfig
-        .apply(globalConfig)
-        .follow(m_rightLeader.isReal() ? m_rightLeader.getWrappedSparkMax() : null);
+    leftFollowerConfig.apply(globalConfig);
+    rightFollowerConfig.apply(globalConfig);
+    // Set follower targets in the config so they persist on the device
+    try { leftFollowerConfig.follow(m_leftLeader); } catch (Throwable ignored) {}
+    try { rightFollowerConfig.follow(m_rightLeader); } catch (Throwable ignored) {}
 
     try {
-      // Apply the configuration to the SPARKs only when real adapters are used
-      if (m_leftLeader.isReal()) m_leftLeader.configure(globalConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_leftFollower.isReal()) m_leftFollower.configure(leftFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_rightLeader.isReal()) m_rightLeader.configure(rightLeaderConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_rightFollower.isReal()) m_rightFollower.configure(rightFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+      // Apply the configuration to all SPARKs. Vendor libraries will handle
+      // simulation vs real behavior; wrap in try/catch to avoid runtime errors
+      // when running in unusual environments.
+      m_leftLeader.configure(globalConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+      m_leftFollower.configure(leftFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+      m_rightLeader.configure(rightLeaderConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+      m_rightFollower.configure(rightFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+
+      // Note: follower targets were set on the config above; runtime follow
+      // calls are optional and may not be available in all library versions.
     } catch (Throwable ignored) {}
 
     m_leftEncoder = m_leftLeader.getEncoder();
@@ -314,11 +223,30 @@ public class Drive extends SubsystemBase {
   m_simHeading = m_gyro.getRotation2d().getRadians();
   m_lastSimTimestamp = Timer.getFPGATimestamp();
 
-  // Initialize sim state from encoders/gyro so simulation starts consistent
-  m_simLeftPosition = m_leftEncoder.getPosition();
-  m_simRightPosition = m_rightEncoder.getPosition();
-  m_simHeading = m_gyro.getRotation2d().getRadians();
-  m_lastSimTimestamp = Timer.getFPGATimestamp();
+    // If running in simulation, attempt to construct a DifferentialDrivetrainSim
+    // using common constructor signature. Wrap in try/catch to remain robust
+    // to WPILib version differences.
+    if (RobotBase.isSimulation()) {
+      try {
+        m_driveSim = new DifferentialDrivetrainSim(
+            DCMotor.getNEO(2),       // 2 NEO motors on each side of the drivetrain.
+    DriveConstants.kDriveGearReduction,                    // 7.29:1 gearing reduction.
+  7.5,                     // MOI of 7.5 kg m^2 (from CAD model).
+  40.0,                    // The mass of the robot is 60 kg.
+  DriveConstants.kWheelDiameterMeters / 2.0, // The robot uses 3" radius wheels.
+  DriveConstants.kTrackwidthMeters,                  // The track width is 0.7112 meters.
+  // The standard deviations for measurement noise:
+  // x and y:          0.001 m
+  // heading:          0.001 rad
+  // l and r velocity: 0.1   m/s
+  // l and r position: 0.005 m
+  VecBuilder.fill(0.001, 0.001, 0.001, 0.1, 0.1, 0.005, 0.005));        // Use reflection to find a compatible DifferentialDrivetrainSim
+
+} catch (Throwable t) {
+        // If anything goes wrong, leave m_driveSim null
+        m_driveSim = null;
+      }
+    }
 
   // Publish Field2d so dashboards (Glass/Shuffleboard) can display robot pose
   SmartDashboard.putData("Field", m_field);
@@ -326,12 +254,6 @@ public class Drive extends SubsystemBase {
   // Initialize kinematics and odometry (encoders configured to meters/m/s)
     m_kinematics = new DifferentialDriveKinematics(DriveConstants.kTrackwidthMeters);
     m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
-
-  // Initialize simple sim state from encoders/gyro so simulation starts consistent
-  m_simLeftPosition = m_leftEncoder.getPosition();
-  m_simRightPosition = m_rightEncoder.getPosition();
-  m_simHeading = m_gyro.getRotation2d().getRadians();
-  m_lastSimTimestamp = Timer.getFPGATimestamp();
 
     try {
       Shuffleboard.getTab("Drive").add("Drive Controls", this).withSize(2, 2).withPosition(0, 0);
@@ -477,10 +399,20 @@ public class Drive extends SubsystemBase {
       leftFollowerConfig.apply(globalConfig);
       rightFollowerConfig.apply(globalConfig);
 
-      if (m_leftLeader.isReal()) m_leftLeader.configure(globalConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_leftFollower.isReal()) m_leftFollower.configure(leftFollowerConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_rightLeader.isReal()) m_rightLeader.configure(rightLeaderConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
-      if (m_rightFollower.isReal()) m_rightFollower.configure(rightFollowerConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      // Re-apply the configs to the devices; vendor libs will handle whether
+      // this is a real device or a simulation instance.
+      try {
+        m_leftLeader.configure(globalConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      } catch (Throwable ignored) {}
+      try {
+        m_leftFollower.configure(leftFollowerConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      } catch (Throwable ignored) {}
+      try {
+        m_rightLeader.configure(rightLeaderConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      } catch (Throwable ignored) {}
+      try {
+        m_rightFollower.configure(rightFollowerConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
+      } catch (Throwable ignored) {}
     } catch (Throwable t) {
       // Ignore if configuration cannot be applied at runtime
     }
@@ -603,14 +535,21 @@ public class Drive extends SubsystemBase {
         m_driveSim.setInputs(leftVolts, rightVolts);
         m_driveSim.update(dt);
 
-  double leftPos = m_driveSim.getLeftPositionMeters();
-  double rightPos = m_driveSim.getRightPositionMeters();
-  m_leftEncoder.setPosition(leftPos);
-  m_rightEncoder.setPosition(rightPos);
+        double leftPos = m_driveSim.getLeftPositionMeters();
+        double rightPos = m_driveSim.getRightPositionMeters();
+        m_leftEncoder.setPosition(leftPos);
+        m_rightEncoder.setPosition(rightPos);
 
-        // Update odometry using simulated pose
+        // Update gyro simulation and odometry using simulated pose
         try {
           var pose = m_driveSim.getPose();
+          // Update ADXRS450 gyro sim with the simulated heading so other code
+          // reading the gyro sees the same value.
+          try {
+            ADXRS450_GyroSim gs = new ADXRS450_GyroSim(m_gyro);
+            gs.setAngle(pose.getRotation().getDegrees());
+          } catch (Throwable ignored) {}
+
           m_odometry.update(pose.getRotation(), leftPos, rightPos);
           m_field.setRobotPose(m_odometry.getPoseMeters());
         } catch (Throwable t) {
@@ -642,19 +581,18 @@ public class Drive extends SubsystemBase {
         double deltaTheta = (rightVel - leftVel) / DriveConstants.kTrackwidthMeters * dt;
         m_simHeading += deltaTheta;
 
+        // Update ADXRS450 gyro simulation so code reading the gyro (in
+        // periodic(), commands, etc.) sees the simulated heading.
+        try {
+          ADXRS450_GyroSim gs = new ADXRS450_GyroSim(m_gyro);
+          gs.setAngle(Math.toDegrees(m_simHeading));
+        } catch (Throwable ignored) {}
+
         // Feed back to SparkMax encoders (we configured encoder position to meters)
         m_leftEncoder.setPosition(m_simLeftPosition);
         m_rightEncoder.setPosition(m_simRightPosition);
 
         
-        // Update odometry using simulated gyro/encoders
-        m_odometry.update(new Rotation2d(m_simHeading), m_simLeftPosition, m_simRightPosition);
-        // Update Field2d (simulation)
-        try {
-          m_field.setRobotPose(m_odometry.getPoseMeters());
-        } catch (Throwable t) {
-          // ignore
-        }
       }
     } catch (Throwable t) {
       // Ignore simulation failures in non-sim environments
