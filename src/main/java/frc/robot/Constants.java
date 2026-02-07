@@ -34,7 +34,7 @@ public final class Constants {
     // These values MUST be determined either experimentally or theoretically for *your* robot's
     // drive. The SysId tool provides a convenient method for obtaining feedback and feedforward
     // values for your robot.
-    public static final double kTurnP = 1;
+    public static final double kTurnP = 0.6;
     public static final double kTurnI = 0;
     public static final double kTurnD = 0;
 
