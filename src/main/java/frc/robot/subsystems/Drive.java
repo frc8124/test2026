@@ -200,30 +200,27 @@ public class Drive extends SubsystemBase {
     m_leftEncoder = m_leftLeader.getEncoder();
     m_rightEncoder = m_rightLeader.getEncoder();
 
+    // reset encoders
+    m_leftEncoder.setPosition(0);
+    m_rightEncoder.setPosition(0);
+
   // Initialize sim state from encoders/gyro so simulation starts consistent
   m_simLeftPosition = m_leftEncoder.getPosition();
   m_simRightPosition = m_rightEncoder.getPosition();
   m_simHeading = m_gyro.getRotation2d().getRadians();
   m_lastSimTimestamp = Timer.getFPGATimestamp();
 
-  // Publish Field2d so dashboards (Glass/Shuffleboard) can display robot pose
-  SmartDashboard.putData("Field", m_field);
-
   // Initialize kinematics and odometry (encoders configured to meters/m/s)
     m_kinematics = new DifferentialDriveKinematics(DriveConstants.kTrackwidthMeters);
     m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
+
+    resetOdometry();
 
   // Initialize slew rate limiters
   m_slewForward = new SlewRateLimiter(DriveConstants.kSlewRateForward);
   m_slewRotate = new SlewRateLimiter(DriveConstants.kSlewRateRotate);
 
-  // Initialize simple sim state from encoders/gyro so simulation starts consistent
-  m_simLeftPosition = m_leftEncoder.getPosition();
-  m_simRightPosition = m_rightEncoder.getPosition();
-  m_simHeading = m_gyro.getRotation2d().getRadians();
-  m_lastSimTimestamp = Timer.getFPGATimestamp();
-
-    // If running in simulation, attempt to construct a DifferentialDrivetrainSim
+  // If running in simulation, attempt to construct a DifferentialDrivetrainSim
     // using common constructor signature. Wrap in try/catch to remain robust
     // to WPILib version differences.
     if (RobotBase.isSimulation()) {
@@ -250,10 +247,6 @@ public class Drive extends SubsystemBase {
 
   // Publish Field2d so dashboards (Glass/Shuffleboard) can display robot pose
   SmartDashboard.putData("Field", m_field);
-
-  // Initialize kinematics and odometry (encoders configured to meters/m/s)
-    m_kinematics = new DifferentialDriveKinematics(DriveConstants.kTrackwidthMeters);
-    m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
 
     try {
       Shuffleboard.getTab("Drive").add("Drive Controls", this).withSize(2, 2).withPosition(0, 0);
@@ -605,11 +598,16 @@ public class Drive extends SubsystemBase {
 
   /** Reset odometry to zero pose and zero the encoders. */
   public void resetOdometry() {
-    try {
+    try {      
       m_leftEncoder.setPosition(0);
       m_rightEncoder.setPosition(0);
+      m_gyro.reset();
       // Reset odometry by recreating the object with zeroed distances
       m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), 0.0, 0.0);
+    
+      m_driveSim.setPose( m_odometry.getPoseMeters());
+      
+    
     } catch (Throwable t) {
       // ignore
     }

@@ -84,8 +84,12 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void autonomousInit() {
+
+    m_robot.resetDrive(); // Reset encoders and gyro at the start of autonomous
+    
     m_autonomousCommand = m_robot.getAutonomousCommand();
 
+  
     if (m_autonomousCommand != null) {
       CommandScheduler.getInstance().schedule(m_autonomousCommand);
     }

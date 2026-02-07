@@ -98,11 +98,17 @@ public class RapidReactCommandBot {
   public Command getAutonomousCommand() {
     // Drive forward for 2 meters at half speed with a 3 second timeout
     return m_drive
-        .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)
+          .turnToAngleCommand(190)  
+  //      .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)
         .withTimeout(AutoConstants.kTimeoutSeconds);
   }
 
   public Drive getDrive() {
     return m_drive;
   }
+
+  public void resetDrive() {
+    m_drive.resetOdometry();
+  }
+
 }
