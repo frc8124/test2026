@@ -32,6 +32,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.math.kinematics.Odometry;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
@@ -310,7 +311,20 @@ public class Drive extends SubsystemBase {
                     >= distanceMeters)
         .finallyDo(interrupted -> m_drive.stopMotor());
   }
+public Command forwardBackCommand(double forwardspeed, double backSpeed, double forwarddistance, double backdistance){
+return runOnce(() -> resetOdometry())
+.andThen(run(() ->
+m_drive.arcadeDrive( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * forwardspeed, 0, false)
+))
+.until (() -> (Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition)) >= forwarddistance))
+.andThen(run(() ->m_drive.arcadeDrive(((forwarddistance - backdistance) - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * backSpeed,  0, false)))
+.until(() -> ((Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) <= (forwarddistance - backdistance)))
+.finallyDo(interrupted -> m_drive.stopMotor());
 
+}
+
+
+ 
   public Command turnToAngleCommand(double angleDeg) {
     return startRun(
             () -> m_controller.reset(m_gyro.getRotation2d().getDegrees()),
