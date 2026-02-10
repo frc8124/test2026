@@ -23,6 +23,11 @@ import edu.wpi.first.wpilibj2.command.Command;
 import java.util.function.DoubleConsumer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
+
+import org.littletonrobotics.junction.AutoLog;
+import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.Logger;
+
 // Slew rate limiters removed — direct joystick inputs are used now
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -75,6 +80,7 @@ public class Drive extends SubsystemBase {
 //  private final RelativeEncoder m_rightEncoder;
   // Kinematics & odometry
   private DifferentialDriveKinematics m_kinematics;
+  
   private DifferentialDriveOdometry m_odometry;
   // Simulation state (simple kinematic sim)
   private double m_simLeftPosition = 0.0; // meters
@@ -314,17 +320,23 @@ public class Drive extends SubsystemBase {
 public Command forwardBackCommand(double forwardspeed, double backSpeed, double forwarddistance, double backdistance){
 return runOnce(() -> resetOdometry())
 .andThen(run(() ->
-m_drive.arcadeDrive( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * forwardspeed, 0, false)
+arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * forwardspeed, 0, false)
 ))
 .until (() -> (Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition)) >= forwarddistance))
-.andThen(run(() ->m_drive.arcadeDrive(((forwarddistance - backdistance) - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * backSpeed,  0, false)))
+.andThen(run(() ->arcadeDriveLogged(((forwarddistance - backdistance) - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * backSpeed,  0, false)))
 .until(() -> ((Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) <= (forwarddistance - backdistance)))
 .finallyDo(interrupted -> m_drive.stopMotor());
 
 }
 
 
- 
+ private void arcadeDriveLogged(double f, double r, boolean sq) {
+  Logger.recordOutput("drive/arcadeF",f);
+  Logger.recordOutput("drive/arcadeR",r);
+  Logger.recordOutput("drive/arcadeSq",sq);
+  m_drive.arcadeDrive(f, r, sq);
+ }
+
   public Command turnToAngleCommand(double angleDeg) {
     return startRun(
             () -> m_controller.reset(m_gyro.getRotation2d().getDegrees()),
@@ -474,6 +486,10 @@ m_drive.arcadeDrive( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPosit
 
   @Override
   public void periodic() {
+
+    
+    Logger.recordOutput("drive/leftEncoderPosition", m_leftEncoder.getPosition());
+    Logger.recordOutput("drive/rightEncoderPosition", m_rightEncoder.getPosition());
     try {
       // Encoders are configured to return meters and meters/second
       SmartDashboard.putNumber("Drive/LeftEncoderPositionMeters", m_leftEncoder.getPosition());
@@ -490,6 +506,7 @@ m_drive.arcadeDrive( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPosit
     try {
       m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
       var pose = m_odometry.getPoseMeters();
+      Logger.recordOutput("drive/odometryPose", pose);
       SmartDashboard.putNumber("Drive/PoseX", pose.getX());
       SmartDashboard.putNumber("Drive/PoseY", pose.getY());
       SmartDashboard.putNumber("Drive/PoseHeadingDeg", pose.getRotation().getDegrees());
