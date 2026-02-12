@@ -28,9 +28,9 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 public class RapidReactCommandBot {
   // The robot's subsystems
   private final Drive m_drive = new Drive();
- // private final Intake m_intake = new Intake();
- // private final Storage m_storage = new Storage();
- // private final Shooter m_shooter = new Shooter();
+  private final Intake m_intake = new Intake();
+  private final Storage m_storage = new Storage();
+ private final Shooter m_shooter = new Shooter();
 
   // The driver's controller
   CommandXboxController m_driverController =
@@ -77,7 +77,7 @@ public class RapidReactCommandBot {
   //  m_driverController.y().onTrue(m_intake.retractCommand());
 
     // Fire the shooter with the A button
-   /*
+   
      m_driverController
         .a()
         .onTrue(
@@ -86,7 +86,7 @@ public class RapidReactCommandBot {
                     m_storage.runCommand())
                 // Since we composed this inline we should give it a name
                 .withName("Shoot"));
-*/
+
 
   }
 
@@ -101,7 +101,8 @@ public class RapidReactCommandBot {
     //     .turnToAngleCommand(190);}  
    //     .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)
    //     .withTimeout(AutoConstants.kTimeoutSeconds);
-   .forwardBackCommand(1, 1, 2, 2);}
+   .forwardBackCommand(1, 1, 2, 2)
+   .withTimeout(AutoConstants.kTimeoutSeconds);}
 
   public Drive getDrive() {
     return m_drive;
