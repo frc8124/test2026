@@ -45,6 +45,7 @@ private RelativeEncoder m_shooterEncoder;
      private final SparkMaxConfig shooterMotorConfig = new SparkMaxConfig();
      private final SparkMaxConfig feederMotorConfig = new SparkMaxConfig();
 
+     private double m_setpoint = 0.0;
 
   /** The shooter subsystem for the robot. */
   public Shooter() {
@@ -55,7 +56,7 @@ private RelativeEncoder m_shooterEncoder;
         .smartCurrentLimit(30)
         .idleMode(IdleMode.kBrake);
 
-    globalConfig.closedLoop.pid(ShooterConstants.kP, 0.0, 0.0);
+    globalConfig.closedLoop.pid(ShooterConstants.kP, 0.0, ShooterConstants.kD);
     globalConfig.closedLoop.allowedClosedLoopError(ShooterConstants.kShooterToleranceRPS,ClosedLoopSlot.kSlot0);
     globalConfig.closedLoop.feedForward.kS(ShooterConstants.kSVolts);
     globalConfig.closedLoop.feedForward.kV(ShooterConstants.kVVoltSecondsPerRotation);
@@ -66,7 +67,7 @@ private RelativeEncoder m_shooterEncoder;
 
      shooterMotorConfig
         .apply(globalConfig)
-        .inverted(false);
+        .inverted(true);
 
 
     feederMotorConfig
@@ -89,6 +90,7 @@ private RelativeEncoder m_shooterEncoder;
     setDefaultCommand(
         runOnce(
                 () -> {
+                  this.setSetpoint(0.0);
                   m_shooterMotor.set(0); // disable();
                  // m_feederMotor.disable();
                 })
@@ -106,8 +108,8 @@ private RelativeEncoder m_shooterEncoder;
             // Run the shooter flywheel at the desired setpoint using feedforward and feedback
             run(
                 () -> {
-                 
-                  m_shooterMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecond,  SparkBase.ControlType.kVelocity);
+                 this.setSetpoint(setpointRotationsPerSecond);
+                 m_shooterMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecond,  SparkBase.ControlType.kVelocity);
                 }
             )
             // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
@@ -115,10 +117,15 @@ private RelativeEncoder m_shooterEncoder;
  //    );
   }
 
+  private void setSetpoint(double setpoint) {
+    m_setpoint = setpoint;
+  }
+
   @Override
   public void periodic() {
     try {
       double pos = (m_shooterEncoder != null) ? m_shooterEncoder.getPosition() : 0.0;
+      SmartDashboard.putNumber("Shooter/SetPoint", m_setpoint);
       SmartDashboard.putNumber("Shooter/EncoderPosition", pos);
       SmartDashboard.putNumber("Shooter/EncoderVelocity",  m_shooterEncoder.getVelocity());
     } catch (Throwable t) {
