@@ -80,10 +80,10 @@ public class RapidReactCommandBot {
    
      m_driverController
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
-        .onTrue(
-           parallel(
-                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS),
-                    m_storage.runCommand())
+        .whileTrue(
+     //      parallel(
+                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS)
+     //               m_storage.runCommand())
                 // Since we composed this inline we should give it a name
                .withName("Shoot"));
 

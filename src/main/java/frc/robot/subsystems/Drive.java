@@ -554,7 +554,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
         } else {
           rightVolts = m_rightLeader.get() * RobotController.getBatteryVoltage();
         }
-
+        
         // Step the drivetrain sim and read out wheel positions/velocities
         m_driveSim.setInputs(leftVolts, rightVolts);
         m_driveSim.update(dt);

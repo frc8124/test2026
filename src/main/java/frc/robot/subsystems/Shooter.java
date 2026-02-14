@@ -7,11 +7,15 @@ package frc.robot.subsystems;
 import static edu.wpi.first.wpilibj2.command.Commands.parallel;
 import static edu.wpi.first.wpilibj2.command.Commands.waitUntil;
 
+import com.revrobotics.spark.ClosedLoopSlot;
+import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkBase.ControlType;
 
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Encoder;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.ShooterConstants;
@@ -26,6 +30,7 @@ import com.revrobotics.PersistMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
+
 @Logged
 public class Shooter extends SubsystemBase {
 
@@ -37,29 +42,56 @@ private RelativeEncoder m_shooterEncoder;
 
   
 
-  private final SimpleMotorFeedforward m_shooterFeedforward =
-      new SimpleMotorFeedforward(
-          ShooterConstants.kSVolts, ShooterConstants.kVVoltSecondsPerRotation);
-  private final PIDController m_shooterFeedback = new PIDController(ShooterConstants.kP, 0.0, 0.0);
      private final SparkMaxConfig shooterMotorConfig = new SparkMaxConfig();
      private final SparkMaxConfig feederMotorConfig = new SparkMaxConfig();
+
+
   /** The shooter subsystem for the robot. */
   public Shooter() {
-    
+
+     SparkMaxConfig globalConfig = new SparkMaxConfig();
+   
+    globalConfig
+        .smartCurrentLimit(30)
+        .idleMode(IdleMode.kBrake);
+
+    globalConfig.closedLoop.pid(ShooterConstants.kP, 0.0, 0.0);
+    globalConfig.closedLoop.allowedClosedLoopError(ShooterConstants.kShooterToleranceRPS,ClosedLoopSlot.kSlot0);
+    globalConfig.closedLoop.feedForward.kS(ShooterConstants.kSVolts);
+    globalConfig.closedLoop.feedForward.kV(ShooterConstants.kVVoltSecondsPerRotation);
+       
+    globalConfig.encoder.countsPerRevolution(ShooterConstants.kEncoderCPR);
+    globalConfig.encoder.positionConversionFactor((float) 1.0); // to get revolutions of flywheel per pulse
+    globalConfig.encoder.velocityConversionFactor((float) 1.0 / 60.0); // revs per second
+
+     shooterMotorConfig
+        .apply(globalConfig)
+        .inverted(false);
+
+
+    feederMotorConfig
+        .apply(globalConfig)
+        .inverted(false);
+
+
   m_shooterMotor = new SparkMax(DriveConstants.kShooterMotorID, MotorType.kBrushed);
  // m_feederMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
-    m_shooterFeedback.setTolerance(ShooterConstants.kShooterToleranceRPS);
+ //   m_shooterFeedback.setTolerance(ShooterConstants.kShooterToleranceRPS);
    // m_shooterEncoder.setDistancePerPulse(ShooterConstants.kEncoderDistancePerPulse);
   m_shooterMotor.configure(shooterMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+  
+  m_shooterMotor.set(0);
+
+  // Initialize shooter encoder wrapper from the motor controller
+  try { m_shooterEncoder = m_shooterMotor.getEncoder(); } catch (Throwable ignored) {}
  // m_feederMotor.configure(feederMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
     // Set default command to turn off both the shooter and feeder motors, and then idle
     setDefaultCommand(
         runOnce(
                 () -> {
-                  m_shooterMotor.disable();
+                  m_shooterMotor.set(0); // disable();
                  // m_feederMotor.disable();
                 })
-            .andThen(run(() -> {}))
             .withName("Idle"));
   }
 
@@ -70,19 +102,27 @@ private RelativeEncoder m_shooterEncoder;
    * @param setpointRotationsPerSecond The desired shooter velocity
    */
   public Command shootCommand(double setpointRotationsPerSecond) {
-    return parallel(
+    return // parallel(
             // Run the shooter flywheel at the desired setpoint using feedforward and feedback
             run(
                 () -> {
-                  m_shooterMotor.set(
-                      m_shooterFeedforward.calculate(setpointRotationsPerSecond)
-                          + m_shooterFeedback.calculate(
-                              m_shooterEncoder.getVelocity(), setpointRotationsPerSecond));
-                }),           waitUntil(m_shooterFeedback::atSetpoint).andThen(() -> m_shooterMotor.set(0))
-
-            // Wait until the shooter has reached the setpoint, and then run the feeder
-            //waitUntil(m_shooterFeedback::atSetpoint).andThen(() -> m_feederMotor.set(1))
+                 
+                  m_shooterMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecond,  SparkBase.ControlType.kVelocity);
+                }
             )
+            // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
         .withName("Shoot");
+ //    );
+  }
+
+  @Override
+  public void periodic() {
+    try {
+      double pos = (m_shooterEncoder != null) ? m_shooterEncoder.getPosition() : 0.0;
+      SmartDashboard.putNumber("Shooter/EncoderPosition", pos);
+      SmartDashboard.putNumber("Shooter/EncoderVelocity",  m_shooterEncoder.getVelocity());
+    } catch (Throwable t) {
+      // ignore errors in dashboard publishing
+    }
   }
 }

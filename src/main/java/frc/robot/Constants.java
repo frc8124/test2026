@@ -19,8 +19,8 @@ public final class Constants {
     public static final int kLeftMotor2ID = 2;
     public static final int kRightMotor1ID = 3;
     public static final int kRightMotor2ID = 4;
-    public static final int kShooterMotorID = 5;
-    public static final int kFeederMotorID = 6;
+    public static final int kShooterMotorID = 10;
+    public static final int kFeederMotorID = 11;
 
 
     public static final int[] kLeftEncoderPorts = {0, 1};
@@ -84,16 +84,16 @@ public final class Constants {
   public static final class ShooterConstants {
     public static final int[] kEncoderPorts = {4, 5};
     public static final boolean kEncoderReversed = false;
-    public static final int kEncoderCPR = 1024;
+    public static final int kEncoderCPR = 8192;
     // Distance units will be rotations
     public static final double kEncoderDistancePerPulse = 1.0 / kEncoderCPR;
 
     public static final int kShooterMotorPort = 4;
     public static final int kFeederMotorPort = 5;
 
-    public static final double kShooterFreeRPS = 5300;
-    public static final double kShooterTargetRPS = 4000;
-    public static final double kShooterToleranceRPS = 50;
+    public static final double kShooterFreeRPS = 5300.0 / 60.0;
+    public static final double kShooterTargetRPS = 4;
+    public static final double kShooterToleranceRPS = 0.1;
 
     // These are not real PID gains, and will have to be tuned for your specific robot.
     public static final double kP = 1;
