@@ -30,7 +30,7 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 public class Shooter extends SubsystemBase {
 
   private SparkMax m_shooterMotor;
-  private SparkMax m_feederMotor;
+ // private SparkMax m_feederMotor;
 
 
 private RelativeEncoder m_shooterEncoder;
@@ -47,17 +47,17 @@ private RelativeEncoder m_shooterEncoder;
   public Shooter() {
     
   m_shooterMotor = new SparkMax(DriveConstants.kShooterMotorID, MotorType.kBrushed);
-  m_feederMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
+ // m_feederMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
     m_shooterFeedback.setTolerance(ShooterConstants.kShooterToleranceRPS);
    // m_shooterEncoder.setDistancePerPulse(ShooterConstants.kEncoderDistancePerPulse);
   m_shooterMotor.configure(shooterMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
-  m_feederMotor.configure(feederMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+ // m_feederMotor.configure(feederMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
     // Set default command to turn off both the shooter and feeder motors, and then idle
     setDefaultCommand(
         runOnce(
                 () -> {
                   m_shooterMotor.disable();
-                  m_feederMotor.disable();
+                 // m_feederMotor.disable();
                 })
             .andThen(run(() -> {}))
             .withName("Idle"));
@@ -78,10 +78,11 @@ private RelativeEncoder m_shooterEncoder;
                       m_shooterFeedforward.calculate(setpointRotationsPerSecond)
                           + m_shooterFeedback.calculate(
                               m_shooterEncoder.getVelocity(), setpointRotationsPerSecond));
-                }),
+                }),           waitUntil(m_shooterFeedback::atSetpoint).andThen(() -> m_shooterMotor.set(0))
 
             // Wait until the shooter has reached the setpoint, and then run the feeder
-            waitUntil(m_shooterFeedback::atSetpoint).andThen(() -> m_feederMotor.set(1)))
+            //waitUntil(m_shooterFeedback::atSetpoint).andThen(() -> m_feederMotor.set(1))
+            )
         .withName("Shoot");
   }
 }

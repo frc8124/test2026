@@ -71,21 +71,21 @@ public class RapidReactCommandBot {
 
 
 
-    // Deploy the intake with the X button
-  //  m_driverController.x().onTrue(m_intake.intakeCommand());
-    // Retract the intake with the Y button
-  //  m_driverController.y().onTrue(m_intake.retractCommand());
+    // Deploy the intake with the Left trigger
+   // m_driverController.axisGreaterThan(2, 0.25).onTrue(m_intake.intakeCommand());
+    // Retract the intake with the Left trigger release
+   // m_driverController.axisLessThan(2, 0.25).onTrue(m_intake.retractCommand());
 
-    // Fire the shooter with the A button
+    // Fire the shooter with the right trigger
    
      m_driverController
-        .a()
+        .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
         .onTrue(
-            parallel(
+           parallel(
                     m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS),
                     m_storage.runCommand())
                 // Since we composed this inline we should give it a name
-                .withName("Shoot"));
+               .withName("Shoot"));
 
 
   }
