@@ -58,7 +58,7 @@ public class Storage extends SubsystemBase {
      storageMotorConfig
         .apply(globalConfig)
         .inverted(true);
-          m_storageMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
+          m_storageMotor = new SparkMax(12, MotorType.kBrushed);
           try { m_storageEncoder = m_storageMotor.getEncoder(); } catch (Throwable ignored) {}
     // Set default command to turn off the storage motor and then idle
     setDefaultCommand(runOnce(m_storageMotor::disable).andThen(run(() -> {})).withName("Idle"));
