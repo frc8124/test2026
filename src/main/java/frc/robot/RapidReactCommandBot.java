@@ -17,7 +17,8 @@ import frc.robot.subsystems.Storage;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj.Timer;
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
  * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
@@ -31,7 +32,7 @@ public class RapidReactCommandBot {
   private final Intake m_intake = new Intake();
   private final Storage m_storage = new Storage();
  private final Shooter m_shooter = new Shooter();
-
+private boolean forwardrotate = true; 
   // The driver's controller
   CommandXboxController m_driverController =
       new CommandXboxController(OIConstants.kDriverControllerPort);
@@ -81,15 +82,29 @@ public class RapidReactCommandBot {
      m_driverController
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
         .whileTrue(
-     //      parallel(
-                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS)
-     //               m_storage.runCommand())
+           parallel(
+                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS, ShooterConstants.kFeederTargetRPS)
+                    
+                   ,m_storage.runCommand(forwardrotate)
+                  )
                 // Since we composed this inline we should give it a name
                .withName("Shoot"));
 
 
+  
+m_driverController.axisGreaterThan(2, 0.25).onTrue(Commands.runOnce(() -> forwardrotate = !forwardrotate));
+
+//.onTrue(() -> {if (forwardrotate) {return forwardrotate = false;} else {return forwardrotate = true;}}); // Toggle forward and backward rotation of storage motor with left trigger
+       
+      // (() -> {if (forwardrotate) {forwardrotate = false;} else {forwardrotate = true;}}); // Toggle forward and backward rotation of storage motor with left trigger
   }
 
+  /**
+   * Centralized simulation step. Called from Robot.simulationPeriodic().
+   */
+
+
+  
   /**
    * Use this to define the command that runs during autonomous.
    *

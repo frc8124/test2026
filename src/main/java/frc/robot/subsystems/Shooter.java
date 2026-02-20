@@ -17,6 +17,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Encoder;
+import edu.wpi.first.wpilibj.Timer;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.ShooterConstants;
 import edu.wpi.first.wpilibj.motorcontrol.PWMSparkMax;
@@ -35,15 +36,18 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 public class Shooter extends SubsystemBase {
 
   private SparkMax m_shooterMotor;
- // private SparkMax m_feederMotor;
+  private SparkMax m_feederMotor;
 
 
 private RelativeEncoder m_shooterEncoder;
+  // internal simulation state (rotations)
+  private double m_simShooterPosition = 0.0;
 
   
 
      private final SparkMaxConfig shooterMotorConfig = new SparkMaxConfig();
-     private final SparkMaxConfig feederMotorConfig = new SparkMaxConfig();
+     private final SparkMaxConfig feederMotorConfig = new SparkMaxConfig(); //uncomment to add feeder motor back in
+     
 
      private double m_setpoint = 0.0;
 
@@ -73,10 +77,10 @@ private RelativeEncoder m_shooterEncoder;
     feederMotorConfig
         .apply(globalConfig)
         .inverted(false);
-
+ // Initialize feeder motor
 
   m_shooterMotor = new SparkMax(DriveConstants.kShooterMotorID, MotorType.kBrushed);
- // m_feederMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
+  m_feederMotor = new SparkMax(DriveConstants.kFeederMotorID, MotorType.kBrushed);
  //   m_shooterFeedback.setTolerance(ShooterConstants.kShooterToleranceRPS);
    // m_shooterEncoder.setDistancePerPulse(ShooterConstants.kEncoderDistancePerPulse);
   m_shooterMotor.configure(shooterMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
@@ -85,14 +89,14 @@ private RelativeEncoder m_shooterEncoder;
 
   // Initialize shooter encoder wrapper from the motor controller
   try { m_shooterEncoder = m_shooterMotor.getEncoder(); } catch (Throwable ignored) {}
- // m_feederMotor.configure(feederMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
+  m_feederMotor.configure(feederMotorConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters); //uncomment to add feeder motor back in
     // Set default command to turn off both the shooter and feeder motors, and then idle
     setDefaultCommand(
         runOnce(
                 () -> {
                   this.setSetpoint(0.0);
                   m_shooterMotor.set(0); // disable();
-                 // m_feederMotor.disable();
+                  m_feederMotor.set(0); // disable();
                 })
             .withName("Idle"));
   }
@@ -102,14 +106,17 @@ private RelativeEncoder m_shooterEncoder;
    * up to the specified setpoint, and then runs the feeder motor.
    *
    * @param setpointRotationsPerSecond The desired shooter velocity
+   * @param setpointRotationsPerSecondFeeder The desired feeder velocity
    */
-  public Command shootCommand(double setpointRotationsPerSecond) {
+  public Command shootCommand(double setpointRotationsPerSecond, double setpointRotationsPerSecondFeeder) {
     return // parallel(
             // Run the shooter flywheel at the desired setpoint using feedforward and feedback
             run(
                 () -> {
                  this.setSetpoint(setpointRotationsPerSecond);
+                 this.setSetpoint(setpointRotationsPerSecondFeeder);
                  m_shooterMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecond,  SparkBase.ControlType.kVelocity);
+                m_feederMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecondFeeder,  SparkBase.ControlType.kVelocity); //uncomment to add feeder motor back in
                 }
             )
             // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
@@ -132,4 +139,7 @@ private RelativeEncoder m_shooterEncoder;
       // ignore errors in dashboard publishing
     }
   }
+
+ 
+
 }
