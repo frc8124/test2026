@@ -159,9 +159,23 @@ private RelativeEncoder m_shooterEncoder;
             )
             // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
         .withName("Shoot");
+
+        
  //    );
   }
+public Command unloadCommand() {
+return 
+run(
+                () -> {
+                 this.setSetpoint(-ShooterConstants.kShoooterIntakeRPM);
+                 m_shooterMotor.getClosedLoopController().setSetpoint(-ShooterConstants.kShoooterIntakeRPM,  SparkBase.ControlType.kVelocity);
+                //m_feederMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecondFeeder,  SparkBase.ControlType.kVelocity); //uncomment to add feeder motor back in
+                }
+            );
 
+
+
+}
   public Command speedupCommand() {
     return // parallel(
             // Run the shooter flywheel at the desired setpoint using feedforward and feedback
@@ -212,13 +226,14 @@ private RelativeEncoder m_shooterEncoder;
       m_flywheelSim.setInputVoltage(motorVoltage);
       m_flywheelSim.update(dt);
       double angVelRadPerSec = m_flywheelSim.getAngularVelocityRadPerSec();
-      m_simVelocity = angVelRadPerSec / (2.0 * Math.PI);
-      m_simPosition += m_simVelocity * 0.02;
+      m_simVelocity = angVelRadPerSec / (2.0 * Math.PI) * 60.0; // convert to RPM
+      m_simPosition += m_simVelocity * (0.02 / 60.0);
     } catch (Throwable ignored) {
       // fallback simple model
     }
 
     // this updates the simulated encoder too
     m_shooterSim.iterate(m_simVelocity, motorVoltage, dt);
+  
   }
 }

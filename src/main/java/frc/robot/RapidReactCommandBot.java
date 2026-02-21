@@ -105,11 +105,16 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
                 // Since we composed this inline we should give it a name
                .withName("Intake"));
 
-    
+   
+  m_driverController.rightBumper().onTrue(
+    parallel(
+      m_shooter.unloadCommand()
+      ,m_storage.runCommand( false)));
   }
 
+
   /**
-   * Centralized simulation step. Called from Robot.simulationPeriodic().
+   * lized simulation step. Called from Robot.simulationPeriodic().
    */
 
 
