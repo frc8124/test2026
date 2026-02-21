@@ -123,6 +123,7 @@ public final class Constants {
     public static final double kShooterToleranceRPS = 0.5;
     public static final double kSVolts = 0.1; // 0.05;
     public static final double kVVoltSecondsPerRotation = 12.0 / (5300.0 / 60.0);  
+    public static final int kstorageCANID = 12;
   }
 
   public static final class AutoConstants {

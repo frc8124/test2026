@@ -92,11 +92,9 @@ private boolean forwardrotate = true;
 
 
   
-m_driverController.axisGreaterThan(2, 0.25).onTrue(Commands.runOnce(() -> forwardrotate = !forwardrotate));
-
-//.onTrue(() -> {if (forwardrotate) {return forwardrotate = false;} else {return forwardrotate = true;}}); // Toggle forward and backward rotation of storage motor with left trigger
+m_driverController.axisGreaterThan(2, 0.25).onTrue(Commands.runOnce(() -> forwardrotate = !forwardrotate)); // Toggle forward and backward rotation of storage motor with left trigger
        
-      // (() -> {if (forwardrotate) {forwardrotate = false;} else {forwardrotate = true;}}); // Toggle forward and backward rotation of storage motor with left trigger
+    
   }
 
   /**

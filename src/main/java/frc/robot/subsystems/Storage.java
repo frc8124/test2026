@@ -58,7 +58,7 @@ public class Storage extends SubsystemBase {
      storageMotorConfig
         .apply(globalConfig)
         .inverted(true);
-          m_storageMotor = new SparkMax(12, MotorType.kBrushed);
+          m_storageMotor = new SparkMax(StorageConstants.kstorageCANID, MotorType.kBrushed);
           try { m_storageEncoder = m_storageMotor.getEncoder(); } catch (Throwable ignored) {}
     // Set default command to turn off the storage motor and then idle
     setDefaultCommand(runOnce(m_storageMotor::disable).andThen(run(() -> {})).withName("Idle"));
@@ -67,9 +67,9 @@ public class Storage extends SubsystemBase {
   /** Returns a command that runs the storage motor indefinitely. */
   public Command runCommand(boolean moveDirection) {
     if (moveDirection) {
-      return run(() -> m_storageMotor.set(1)).withName("run");
+      return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(-1.0,  SparkBase.ControlType.kVelocity));
     } else {
-       return run(() -> m_storageMotor.set(-1)).withName("run");
+        return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(1.0,  SparkBase.ControlType.kVelocity));
     }
      //
     
