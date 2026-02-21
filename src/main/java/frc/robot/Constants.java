@@ -92,8 +92,9 @@ public final class Constants {
     public static final int kFeederMotorPort = 5;
 
     public static final double kShooterFreeRPS = 5300.0 / 60.0;
-    public static final double kShooterTargetRPS = 80.0;
-    public static final double kShooterToleranceRPS = 0.05;
+    public static final double kShooterTargetRPM = 3000.0;
+    public static final double kShoooterIntakeRPM = 2000.0;
+    public static final double kShooterToleranceRPM = 40.0;
     public static final double kFeederTargetRPS = 30.0; //ai generated number, not permanant
 
     // These are not real PID gains, and will have to be tuned for your specific robot.
@@ -118,12 +119,14 @@ public final class Constants {
     public static final int kMotorPort = 7;
     public static final int kBallSensorPort = 6;
     public static final int kEncoderCPR = 8192;
-    public static final double kP = 0.07;
-    public static final double kD = 0.01;
-    public static final double kShooterToleranceRPS = 0.5;
-    public static final double kSVolts = 0.1; // 0.05;
-    public static final double kVVoltSecondsPerRotation = 12.0 / (5300.0 / 60.0);  
+    public static final double kP = 0.004;
+    public static final double kD = 0.00;
+    public static final double kToleranceRPM = 10.0;
+    public static final double kSVolts = 0.0035; // 0.05;
+    public static final double kVVoltSecondsPerRotation = 0.003;
     public static final int kstorageCANID = 12;
+    public static final double kIntakeRPM = 1000.0;
+    public static final double kOuttakeRPM = -1000.0;
   }
 
   public static final class AutoConstants {

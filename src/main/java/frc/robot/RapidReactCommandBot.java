@@ -5,6 +5,7 @@
 package frc.robot;
 
 import static edu.wpi.first.wpilibj2.command.Commands.parallel;
+import static edu.wpi.first.wpilibj2.command.Commands.sequence;
 
 import edu.wpi.first.epilogue.Logged;
 import frc.robot.Constants.AutoConstants;
@@ -82,18 +83,28 @@ private boolean forwardrotate = true;
      m_driverController
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
         .whileTrue(
+          sequence(
+             m_shooter.speedupCommand(),
+                   
            parallel(
-                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPS, ShooterConstants.kFeederTargetRPS)
+                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPM, ShooterConstants.kFeederTargetRPS)
                     
-                   ,m_storage.runCommand(forwardrotate)
+                   ,m_storage.runCommand( false )
                   )
+          )
                 // Since we composed this inline we should give it a name
                .withName("Shoot"));
 
 
   
-m_driverController.axisGreaterThan(2, 0.25).onTrue(Commands.runOnce(() -> forwardrotate = !forwardrotate)); // Toggle forward and backward rotation of storage motor with left trigger
-       
+m_driverController.axisGreaterThan(2, 0.25).whileTrue(
+           parallel(
+                    m_shooter.shootCommand(ShooterConstants.kShoooterIntakeRPM, ShooterConstants.kFeederTargetRPS)
+                   ,m_storage.runCommand( true )
+                  )
+                // Since we composed this inline we should give it a name
+               .withName("Intake"));
+
     
   }
 

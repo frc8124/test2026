@@ -70,12 +70,8 @@ private RelativeEncoder m_shooterEncoder;
    
     globalConfig
         .smartCurrentLimit(30)
-        .idleMode(IdleMode.kBrake);
+        .idleMode(IdleMode.kCoast);
 
-    globalConfig.closedLoop.pid(ShooterConstants.kP, 0.0, ShooterConstants.kD);
-    globalConfig.closedLoop.allowedClosedLoopError(ShooterConstants.kShooterToleranceRPS,ClosedLoopSlot.kSlot0);
-    globalConfig.closedLoop.feedForward.kS(ShooterConstants.kSVolts);
-    globalConfig.closedLoop.feedForward.kV(ShooterConstants.kVVoltSecondsPerRotation);
        
     globalConfig.encoder.countsPerRevolution(ShooterConstants.kEncoderCPR);
     globalConfig.encoder.positionConversionFactor((float) 1.0); // to get revolutions of flywheel per pulse
@@ -86,8 +82,12 @@ private RelativeEncoder m_shooterEncoder;
 
      shooterMotorConfig
         .apply(globalConfig)
-        .inverted(true);
-
+        .inverted(true)
+        .closedLoop.pid(ShooterConstants.kP, 0.0, ShooterConstants.kD)
+          .allowedClosedLoopError(ShooterConstants.kShooterToleranceRPM,ClosedLoopSlot.kSlot0)
+          .feedForward.kS(ShooterConstants.kSVolts)
+            .kV(ShooterConstants.kVVoltSecondsPerRotation);
+    
 
   /*   feederMotorConfig
         .apply(globalConfig)
@@ -153,13 +153,25 @@ private RelativeEncoder m_shooterEncoder;
             run(
                 () -> {
                  this.setSetpoint(setpointRotationsPerSecond);
-                 this.setSetpoint(setpointRotationsPerSecondFeeder);
                  m_shooterMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecond,  SparkBase.ControlType.kVelocity);
                 //m_feederMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecondFeeder,  SparkBase.ControlType.kVelocity); //uncomment to add feeder motor back in
                 }
             )
             // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
         .withName("Shoot");
+ //    );
+  }
+
+  public Command speedupCommand() {
+    return // parallel(
+            // Run the shooter flywheel at the desired setpoint using feedforward and feedback
+            run(
+                () -> {
+                 m_shooterMotor.getClosedLoopController().setSetpoint( ShooterConstants.kShooterTargetRPM, SparkBase.ControlType.kVelocity);
+                }
+            )
+            .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
+        .withName("SpeedUp");
  //    );
   }
 

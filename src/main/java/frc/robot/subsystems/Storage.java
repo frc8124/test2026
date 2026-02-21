@@ -44,16 +44,16 @@ public class Storage extends SubsystemBase {
    
     globalConfig
         .smartCurrentLimit(30)
-        .idleMode(IdleMode.kBrake);
+        .idleMode(IdleMode.kCoast);
 
     globalConfig.closedLoop.pid(StorageConstants.kP, 0.0, StorageConstants.kD);
-    globalConfig.closedLoop.allowedClosedLoopError(StorageConstants.kShooterToleranceRPS,ClosedLoopSlot.kSlot0);
+    globalConfig.closedLoop.allowedClosedLoopError(StorageConstants.kToleranceRPM ,ClosedLoopSlot.kSlot0);
     globalConfig.closedLoop.feedForward.kS(StorageConstants.kSVolts);
     globalConfig.closedLoop.feedForward.kV(StorageConstants.kVVoltSecondsPerRotation);
        
     globalConfig.encoder.countsPerRevolution(StorageConstants.kEncoderCPR);
-    globalConfig.encoder.positionConversionFactor((float) 1.0 / 8.4); // to get revolutions of motor per pulse
-    globalConfig.encoder.velocityConversionFactor((float) 1.0 / 60.0); // revs per second
+    globalConfig.encoder.positionConversionFactor((float) 1.0 ); // to get revolutions of motor per pulse
+    globalConfig.encoder.velocityConversionFactor((float) 1.0 ); // revs per second
 
      storageMotorConfig
         .apply(globalConfig)
@@ -65,11 +65,11 @@ public class Storage extends SubsystemBase {
   }
 
   /** Returns a command that runs the storage motor indefinitely. */
-  public Command runCommand(boolean moveDirection) {
-    if (moveDirection) {
-      return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(-1.0,  SparkBase.ControlType.kVelocity));
+  public Command runCommand(boolean inwards) {
+    if (inwards) {
+      return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(StorageConstants.kIntakeRPM,  SparkBase.ControlType.kVelocity));
     } else {
-        return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(1.0,  SparkBase.ControlType.kVelocity));
+        return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(StorageConstants.kOuttakeRPM,  SparkBase.ControlType.kVelocity));
     }
      //
     
