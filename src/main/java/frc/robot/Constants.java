@@ -97,14 +97,14 @@ public final class Constants {
     public static final double kFeederTargetRPS = 30.0; //ai generated number, not permanant
 
     // These are not real PID gains, and will have to be tuned for your specific robot.
-    public static final double kP = 0.5;
-    public static final double kD = 0.01;
-
+    public static final double kP =  0.004; //0.5;
+    public static final double kD = 0.00;
+//public static final double kVS = 
     // On a real robot the feedforward constants should be empirically determined; these are
     // reasonable guesses.
-    public static final double kSVolts = 0.1; // 0.05;
+    public static final double kSVolts = 0.0035; // 0.05;
     // Should have value 12V at free speed
-    public static final double kVVoltSecondsPerRotation = 12.0 / kShooterFreeRPS;
+    public static final double kVVoltSecondsPerRotation = 0.003;
 
     public static final double kFeederSpeed = 0.5;
   }
