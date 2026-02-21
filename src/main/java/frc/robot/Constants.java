@@ -74,11 +74,11 @@ public final class Constants {
     (kMotorFreeSpeedRPM / kDriveGearReduction) / 60.0 * (Math.PI * kWheelDiameterMeters);
     // Slew-rate limiter rates (units: input units per second). These limit how
     // quickly joystick inputs can change. Tune to taste.
-    public static final double kSlewRateForward = 3.0; // per second
-    public static final double kSlewRateRotate = 3.0; // per second
+    public static final double kSlewRateForward = 1.0; // per second
+    public static final double kSlewRateRotate = 1.0; // per second
     // Allowed range for slew-rate limiter configuration
     public static final double kSlewMin = 0.0;
-    public static final double kSlewMax = 10.0;
+    public static final double kSlewMax = 1.0;
   }
 
   public static final class ShooterConstants {
@@ -92,8 +92,9 @@ public final class Constants {
     public static final int kFeederMotorPort = 5;
 
     public static final double kShooterFreeRPS = 5300.0 / 60.0;
-    public static final double kShooterTargetRPS = 1.0;
+    public static final double kShooterTargetRPS = 80.0;
     public static final double kShooterToleranceRPS = 0.05;
+    public static final double kFeederTargetRPS = 30.0; //ai generated number, not permanant
 
     // These are not real PID gains, and will have to be tuned for your specific robot.
     public static final double kP = 0.5;
@@ -116,6 +117,13 @@ public final class Constants {
   public static final class StorageConstants {
     public static final int kMotorPort = 7;
     public static final int kBallSensorPort = 6;
+    public static final int kEncoderCPR = 8192;
+    public static final double kP = 0.07;
+    public static final double kD = 0.01;
+    public static final double kShooterToleranceRPS = 0.5;
+    public static final double kSVolts = 0.1; // 0.05;
+    public static final double kVVoltSecondsPerRotation = 12.0 / (5300.0 / 60.0);  
+    public static final int kstorageCANID = 12;
   }
 
   public static final class AutoConstants {
