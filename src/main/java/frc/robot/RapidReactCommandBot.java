@@ -84,13 +84,12 @@ private boolean forwardrotate = true;
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
         .whileTrue(
           sequence(
-             m_shooter.speedupCommand(),
+            m_shooter.speedupCommand(),
                    
-           parallel(
-                    m_shooter.shootCommand(ShooterConstants.kShooterTargetRPM, ShooterConstants.kFeederTargetRPS)
-                    
-                   ,m_storage.runCommand( false )
-                  )
+            parallel(
+              m_shooter.shootCommand(),
+              m_storage.runCommand( false )
+            )
           )
                 // Since we composed this inline we should give it a name
                .withName("Shoot"));
@@ -99,14 +98,14 @@ private boolean forwardrotate = true;
   
 m_driverController.axisGreaterThan(2, 0.25).whileTrue(
            parallel(
-                    m_shooter.shootCommand(ShooterConstants.kShoooterIntakeRPM, ShooterConstants.kFeederTargetRPS)
-                   ,m_storage.runCommand( true )
+                    m_shooter.intakeCommand(),
+                    m_storage.runCommand( true )
                   )
                 // Since we composed this inline we should give it a name
                .withName("Intake"));
 
    
-  m_driverController.rightBumper().onTrue(
+  m_driverController.rightBumper().whileTrue(
     parallel(
       m_shooter.unloadCommand()
       ,m_storage.runCommand( false)));
