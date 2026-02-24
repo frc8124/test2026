@@ -92,7 +92,7 @@ public final class Constants {
     public static final int kFeederMotorPort = 5;
 
     public static final double kShooterFreeRPS = 5300.0 / 60.0;
-    public static final double kShooterTargetRPM = 3000.0;
+    public static final double kShooterTargetRPM = 3800.0;
     public static final double kShoooterIntakeRPM = 2000.0;
     public static final double kShooterToleranceRPM = 40.0;
     public static final double kFeederTargetRPS = 30.0; //ai generated number, not permanant
