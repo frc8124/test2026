@@ -88,7 +88,7 @@ public final class Constants {
     public static final int kShooterMotorPort = 4;
 
     public static final double kFreeRPS = 4000.0 / 60.0;
-    public static final double kTargetRPM = 3000.0;
+    public static final double kTargetRPM = 3800.0;
     public static final double kIntakeRPM = 2000.0;
     public static final double KToleranceRPM = 40.0;
     // These are not real PID gains, and will have to be tuned for your specific robot.
