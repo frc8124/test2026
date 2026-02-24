@@ -19,9 +19,6 @@ public final class Constants {
     public static final int kLeftMotor2ID = 2;
     public static final int kRightMotor1ID = 3;
     public static final int kRightMotor2ID = 4;
-    public static final int kShooterMotorID = 10;
-    public static final int kFeederMotorID = 11;
-
 
     public static final int[] kLeftEncoderPorts = {0, 1};
     public static final int[] kRightEncoderPorts = {2, 3};
@@ -82,32 +79,37 @@ public final class Constants {
   }
 
   public static final class ShooterConstants {
-    public static final int[] kEncoderPorts = {4, 5};
+    public static final int kMotorID = 10;
     public static final boolean kEncoderReversed = false;
     public static final int kEncoderCPR = 8192;
     // Distance units will be rotations
     public static final double kEncoderDistancePerPulse = 1.0 / kEncoderCPR;
 
     public static final int kShooterMotorPort = 4;
-    public static final int kFeederMotorPort = 5;
 
-    public static final double kShooterFreeRPS = 5300.0 / 60.0;
-    public static final double kShooterTargetRPM = 3800.0;
-    public static final double kShoooterIntakeRPM = 2000.0;
-    public static final double kShooterToleranceRPM = 40.0;
-    public static final double kFeederTargetRPS = 30.0; //ai generated number, not permanant
-
+    public static final double kFreeRPS = 4000.0 / 60.0;
+    public static final double kTargetRPM = 3000.0;
+    public static final double kIntakeRPM = 2000.0;
+    public static final double KToleranceRPM = 40.0;
     // These are not real PID gains, and will have to be tuned for your specific robot.
     public static final double kP =  0.004; //0.5;
     public static final double kD = 0.00;
-//public static final double kVS = 
+
     // On a real robot the feedforward constants should be empirically determined; these are
     // reasonable guesses.
     public static final double kSVolts = 0.0035; // 0.05;
     // Should have value 12V at free speed
     public static final double kVVoltSecondsPerRotation = 0.003;
 
-    public static final double kFeederSpeed = 0.5;
+  }
+
+  public static final class FeederConstants {
+    // Moved feeder-specific constants here so they are grouped separately.
+    // Values preserved from previous locations.
+    public static final int kFeederMotorID = 11;         // moved from DriveConstants
+    public static final int kFeederMotorPort = 5;        // moved from ShooterConstants
+    public static final double kFeederTargetRPS = 30.0;  // moved from ShooterConstants
+    public static final double kFeederSpeed = 0.5;       // moved from ShooterConstants
   }
 
   public static final class IntakeConstants {
