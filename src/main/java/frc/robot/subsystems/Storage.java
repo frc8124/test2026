@@ -74,6 +74,8 @@ public class Storage extends SubsystemBase {
      //
     
   }
-
+public Command stopCommand() {return run(
+  (() -> m_storageMotor.disable())
+).withName("StopStore");}
 
 }
