@@ -9,6 +9,10 @@ import static edu.wpi.first.wpilibj2.command.Commands.waitUntil;
 
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj.Timer;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.FeedbackSensor;
 import com.revrobotics.spark.SparkBase;
@@ -138,6 +142,11 @@ public class Shooter extends SubsystemBase {
                 })
             .withName("Idle"));
   }
+public Command stopCommand() {
+  return run (() -> {m_shooterMotor.disable();}).withName ("Stop");
+}
+
+
 
   /**
    * Returns a command to shoot the balls currently stored in the robot. Spins the shooter flywheel

@@ -109,6 +109,11 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
     parallel(
       m_shooter.unloadCommand()
       ,m_storage.runCommand( false)));
+    m_driverController.rightBumper().whileFalse(
+    parallel(
+      m_shooter.stopCommand()
+      ,m_storage.stopCommand()
+      ));
   }
 
 
