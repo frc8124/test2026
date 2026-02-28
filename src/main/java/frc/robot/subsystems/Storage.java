@@ -27,6 +27,7 @@ import com.revrobotics.spark.SparkBase;
 @Logged
 public class Storage extends SubsystemBase {
    private final SparkMaxConfig storageMotorConfig = new SparkMaxConfig();
+     private final SparkMaxConfig storageMotor2Config = new SparkMaxConfig();
   @NotLogged // We'll log a more meaningful boolean instead
  // private final DigitalInput m_ballSensor = new DigitalInput(StorageConstants.kBallSensorPort);
  private SparkMax m_storageMotor;
@@ -37,11 +38,12 @@ public class Storage extends SubsystemBase {
   //@Logged(name = "Has Cargo")
   //@SuppressWarnings("checkstyle:MemberName")
   //public final Trigger hasCargo = new Trigger(m_ballSensor::get);
-
+private SparkMax m_storageMotor2;
   /** Create a new Storage subsystem. */
   public Storage() {
          SparkMaxConfig globalConfig = new SparkMaxConfig();
-   
+
+
     globalConfig
         .smartCurrentLimit(30)
         .idleMode(IdleMode.kCoast);
@@ -58,8 +60,14 @@ public class Storage extends SubsystemBase {
      storageMotorConfig
         .apply(globalConfig)
         .inverted(true);
-          m_storageMotor = new SparkMax(StorageConstants.kstorageCANID, MotorType.kBrushed);
+          m_storageMotor = new SparkMax(10, MotorType.kBrushless);
           try { m_storageEncoder = m_storageMotor.getEncoder(); } catch (Throwable ignored) {}
+         storageMotor2Config
+        .apply(globalConfig)
+        .inverted(true);
+          m_storageMotor = new SparkMax(12, MotorType.kBrushless);
+          try { m_storageEncoder = m_storageMotor.getEncoder(); } catch (Throwable ignored) {}
+       try { storageMotor2Config.follow(m_storageMotor);} catch (Throwable ignored) {}
     // Set default command to turn off the storage motor and then idle
     setDefaultCommand(runOnce(m_storageMotor::disable).andThen(run(() -> {})).withName("Idle"));
   }
@@ -67,9 +75,9 @@ public class Storage extends SubsystemBase {
   /** Returns a command that runs the storage motor indefinitely. */
   public Command runCommand(boolean inwards) {
     if (inwards) {
-      return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(StorageConstants.kIntakeRPM,  SparkBase.ControlType.kVelocity));
+      return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(100,  SparkBase.ControlType.kVelocity));
     } else {
-        return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(StorageConstants.kOuttakeRPM,  SparkBase.ControlType.kVelocity));
+        return run(() -> m_storageMotor.getClosedLoopController().setSetpoint(100,  SparkBase.ControlType.kVelocity));
     }
      //
     

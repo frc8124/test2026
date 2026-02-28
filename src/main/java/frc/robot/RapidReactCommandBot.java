@@ -32,7 +32,7 @@ public class RapidReactCommandBot {
   private final Drive m_drive = new Drive();
   private final Intake m_intake = new Intake();
   private final Storage m_storage = new Storage();
- private final Shooter m_shooter = new Shooter();
+ //private final Shooter m_shooter = new Shooter();
 private boolean forwardrotate = true; 
   // The driver's controller
   CommandXboxController m_driverController =
@@ -84,10 +84,10 @@ private boolean forwardrotate = true;
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
         .whileTrue(
           sequence(
-            m_shooter.speedupCommand(),
+           // m_shooter.speedupCommand(),
                    
             parallel(
-              m_shooter.shootCommand(),
+             // m_shooter.shootCommand(),
               m_storage.runCommand( false )
             )
           )
@@ -98,7 +98,7 @@ private boolean forwardrotate = true;
   
 m_driverController.axisGreaterThan(2, 0.25).whileTrue(
            parallel(
-                    m_shooter.intakeCommand(),
+                   // m_shooter.intakeCommand(),
                     m_storage.runCommand( true )
                   )
                 // Since we composed this inline we should give it a name
@@ -107,8 +107,8 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
    
   m_driverController.rightBumper().whileTrue(
     parallel(
-      m_shooter.unloadCommand()
-      ,m_storage.runCommand( false)));
+   //   m_shooter.unloadCommand(),
+      m_storage.runCommand( false)));
   }
 
 
