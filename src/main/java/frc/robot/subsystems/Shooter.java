@@ -38,6 +38,8 @@ import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 // REV simulation helpers
 import com.revrobotics.sim.SparkMaxSim;
 import com.revrobotics.sim.SparkRelativeEncoderSim;
+import com.revrobotics.Rev2mDistanceSensor;
+import com.revrobotics.Rev2mDistanceSensor.Port;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.ShooterConstants;
 import edu.wpi.first.wpilibj.motorcontrol.PWMSparkMax;
@@ -55,6 +57,8 @@ public class Shooter extends SubsystemBase {
 
   private SparkMax m_shooterMotor;
   private RelativeEncoder m_shooterEncoder;
+  // REV 2m distance sensor (mounted near shooter to measure target distance)
+  private Rev2mDistanceSensor m_rev2m;
   
   // WPILib flywheel sim (used to model motor + inertia)
   private FlywheelSim m_flywheelSim;
@@ -112,6 +116,18 @@ public class Shooter extends SubsystemBase {
 
   // Initialize shooter encoder wrapper from the motor controller
   m_shooterEncoder = m_shooterMotor.getEncoder();
+    // Initialize REV 2m distance sensor (onboard port) if available
+    try {
+      m_rev2m = new Rev2mDistanceSensor(Port.kOnboard);
+      // enable automatic ranging if supported
+      try {
+        m_rev2m.setAutomaticMode(true);
+      } catch (Throwable ignore) {
+        // optional
+      }
+    } catch (Throwable t) {
+      m_rev2m = null; // sensor not available or failed to initialize
+    }
     
   // Setup simulation helpers when running in simulation
   if (RobotBase.isSimulation()) {
@@ -206,6 +222,23 @@ public Command unloadCommand() {
     Logger.recordOutput("Shooter/setpoint", m_shooterMotor.getClosedLoopController().getSetpoint());
     Logger.recordOutput("Shooter/velocity", m_shooterEncoder.getVelocity());
     Logger.recordOutput("Shooter/appliedOutput", m_shooterMotor.getAppliedOutput());
+    // Publish REV 2m distance sensor value if present
+    if (m_rev2m != null) {
+      try {
+        double rangeMeters = m_rev2m.getRange();
+        SmartDashboard.putNumber("Shooter/Rev2mDistanceMeters", rangeMeters);
+      } catch (Throwable t) {
+        // if getRange isn't available, try getRangeMM
+        try {
+          double rangeMM = m_rev2m.getRangeMM();
+          SmartDashboard.putNumber("Shooter/Rev2mDistanceMeters", rangeMM / 1000.0);
+        } catch (Throwable t2) {
+          SmartDashboard.putNumber("Shooter/Rev2mDistanceMeters", Double.NaN);
+        }
+      }
+    } else {
+      SmartDashboard.putNumber("Shooter/Rev2mDistanceMeters", Double.NaN);
+    }
     
   }
 
