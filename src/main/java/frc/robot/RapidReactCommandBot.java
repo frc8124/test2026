@@ -19,6 +19,9 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.ParallelRaceGroup;
+import edu.wpi.first.wpilibj2.command.RepeatCommand;
+import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj.Timer;
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -79,21 +82,26 @@ private boolean forwardrotate = true;
    // m_driverController.axisLessThan(2, 0.25).onTrue(m_intake.retractCommand());
 
     // Fire the shooter with the right trigger
-   
-     m_driverController
-        .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
-        .whileTrue(
+   Command shootBall = 
           sequence(
+            m_storage.stopCommand(),
             m_shooter.speedupCommand(),
                    
-            parallel(
+            new ParallelRaceGroup(
               m_shooter.shootCommand(),
-              m_storage.runCommand( false )
-            )
+              m_storage.runCommand( false ).until( () -> m_shooter.ballInShooter() )
+            ),
+            m_storage.stopCommand(),
+            m_shooter.shootCommand().withTimeout(0.25)
           )
                 // Since we composed this inline we should give it a name
-               .withName("Shoot"));
+               .withName("Shoot");
 
+
+
+     m_driverController
+        .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
+        .whileTrue( new RepeatCommand( shootBall ) );
 
   
 m_driverController.axisGreaterThan(2, 0.25).whileTrue(

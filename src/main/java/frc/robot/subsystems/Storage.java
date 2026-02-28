@@ -20,6 +20,9 @@ import edu.wpi.first.wpilibj.motorcontrol.PWMSparkMax;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+
+import org.littletonrobotics.junction.Logger;
+
 import com.revrobotics.RelativeEncoder;
 import edu.wpi.first.wpilibj.Timer;
 import com.revrobotics.spark.SparkBase;
@@ -61,7 +64,7 @@ public class Storage extends SubsystemBase {
           m_storageMotor = new SparkMax(StorageConstants.kstorageCANID, MotorType.kBrushed);
           try { m_storageEncoder = m_storageMotor.getEncoder(); } catch (Throwable ignored) {}
     // Set default command to turn off the storage motor and then idle
-    setDefaultCommand(runOnce(m_storageMotor::disable).andThen(run(() -> {})).withName("Idle"));
+    setDefaultCommand(runOnce(m_storageMotor::disable).withName("Idle"));
   }
 
   /** Returns a command that runs the storage motor indefinitely. */
@@ -74,8 +77,15 @@ public class Storage extends SubsystemBase {
      //
     
   }
-public Command stopCommand() {return run(
+public Command stopCommand() {return runOnce(
   (() -> m_storageMotor.disable())
 ).withName("StopStore");}
+
+@Override
+  public void periodic() {
+    // Log values for AdvantageScope real time
+    Logger.recordOutput("Storage/velocity", m_storageEncoder.getVelocity() );
+  }
+
 
 }
