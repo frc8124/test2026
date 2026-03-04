@@ -11,7 +11,9 @@ import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import frc.robot.Constants.DriveConstants;
+import frc.robot.LimelightHelpers;
 import com.revrobotics.spark.config.SparkMaxConfig;
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import com.revrobotics.RelativeEncoder;
@@ -129,7 +131,8 @@ public class Drive extends SubsystemBase {
   private double driveI = DriveConstants.kDriveI;
   private double driveD = DriveConstants.kDriveD;
   private double driveFF = DriveConstants.kDriveFF;
-
+  // Pose estimator used for sensor fusion of gyro/encoders + vision.
+  private DifferentialDrivePoseEstimator poseEstimator = null;
   private double ks = DriveConstants.ksVolts;
   private double kv = DriveConstants.kvVoltSecondsPerDegree;
   private double ka = DriveConstants.kaVoltSecondsSquaredPerDegree;
@@ -221,7 +224,30 @@ public class Drive extends SubsystemBase {
     m_kinematics = new DifferentialDriveKinematics(DriveConstants.kTrackwidthMeters);
     m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
 
-    resetOdometry();
+    // Create a pose estimator for sensor fusion of gyro/encoders + vision.
+    // Initialize directly using the standard constructor (guarded by try/catch
+    // in case this WPILib version differs).
+    try {
+      poseEstimator = new DifferentialDrivePoseEstimator(
+          m_kinematics,
+          m_gyro.getRotation2d(),
+          m_leftEncoder.getPosition(),
+          m_rightEncoder.getPosition(),
+          m_odometry.getPoseMeters(),
+          VecBuilder.fill(0.1, 0.1, 0.1),
+          VecBuilder.fill(0.5, 0.5, 0.5));
+    } catch (Throwable ignored) {
+      poseEstimator = null;
+    }
+
+    var visionEstimate = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-rear");
+
+    if (visionEstimate != null && visionEstimate.tagCount > 0 && poseEstimator != null) {
+      try {
+        poseEstimator.addVisionMeasurement(visionEstimate.pose, visionEstimate.timestampSeconds);
+      } catch (Throwable ignored) {}
+      resetOdometry();
+    }
 
   // Initialize slew rate limiters
   m_slewForward = new SlewRateLimiter(DriveConstants.kSlewRateForward);
@@ -379,6 +405,8 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
     try { return s.get(); } catch (Throwable t) { return 0.0; }
   }
 
+  
+
   public double getSlewForward() { return slewLimit1; }
   public double getSlewRotate() { return slewLimit2; }
   public void setSlewForward(double limit) {
@@ -487,7 +515,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
   @Override
   public void periodic() {
 
-    
+
     Logger.recordOutput("drive/leftEncoderPosition", m_leftEncoder.getPosition());
     Logger.recordOutput("drive/rightEncoderPosition", m_rightEncoder.getPosition());
     try {
@@ -502,10 +530,45 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
     } catch (Throwable t) {
       // If anything goes wrong (e.g., encoder not initialized yet), don't crash the robot code
     }
+
+    LimelightHelpers.SetRobotOrientation("limelight", poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);      
+    var vision = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-rear");
+    if (vision == null) {
+      SmartDashboard.putNumber("Drive/VisionTags", -1);
+    } else {
+      SmartDashboard.putNumber("Drive/VisionTags", vision.tagCount);
+    }
+
     // Update odometry with current gyro angle and encoder distances (meters)
     try {
-      m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
-      var pose = m_odometry.getPoseMeters();
+      Pose2d pose = null;
+      if (poseEstimator != null) {
+        // Update the estimator with latest sensor readings
+        try {
+          poseEstimator.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
+        } catch (Throwable ignored) {}
+
+        // Attempt to incorporate vision when available
+        try {
+          
+          if (vision != null && vision.tagCount > 0) {
+            try { poseEstimator.addVisionMeasurement(vision.pose, vision.timestampSeconds); } catch (Throwable ignored) {}
+          }
+        } catch (Throwable ignore) {}
+
+        try {
+          pose = poseEstimator.getEstimatedPosition();
+        } catch (Throwable ignored) {
+          pose = null;
+        }
+      }
+
+      if (pose == null) {
+        // Fallback to raw odometry if estimator isn't available or didn't return a pose
+        m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
+        pose = m_odometry.getPoseMeters();
+      }
+
       Logger.recordOutput("drive/odometryPose", pose);
       SmartDashboard.putNumber("Drive/PoseX", pose.getX());
       SmartDashboard.putNumber("Drive/PoseY", pose.getY());
@@ -635,7 +698,11 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
       m_gyro.reset();
       // Reset odometry by recreating the object with zeroed distances
       m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), 0.0, 0.0);
-    
+      // Reset the pose estimator (if present) to agree with the newly-reset odometry
+      try {
+        if (poseEstimator != null) poseEstimator.resetPosition(m_gyro.getRotation2d(), 0.0, 0.0, m_odometry.getPoseMeters());
+      } catch (Throwable ignored) {}
+
       m_driveSim.setPose( m_odometry.getPoseMeters());
       
     

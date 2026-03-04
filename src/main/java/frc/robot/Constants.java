@@ -5,6 +5,13 @@
 package frc.robot;
 
 import edu.wpi.first.math.util.Units;
+// Constants.java
+
+import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
+
+
 /**
  * The Constants class provides a convenient place for teams to hold robot-wide numerical or boolean
  * constants. This class should not be used for any other purpose. All constants should be declared
@@ -77,7 +84,19 @@ public final class Constants {
     public static final double kSlewMin = 0.0;
     public static final double kSlewMax = 1.0;
   }
-
+public static final Transform3d kRobotToLimelight =
+    new Transform3d(
+        new Translation3d(
+            -0.2286,   // forward from robot center (meters)
+            0.03175,    // left (+) / right (-)
+            0.2286    // height (meters)
+        ),
+        new Rotation3d(
+            0.0,                    // roll
+            Math.toRadians(32),     // pitch (camera tilted up 32°)
+            Math.toRadians(180)                     // yaw
+        )
+    );
   public static final class ShooterConstants {
     public static final int kMotorID = 10;
     public static final boolean kEncoderReversed = false;
