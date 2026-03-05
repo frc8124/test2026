@@ -15,6 +15,7 @@ import frc.robot.subsystems.Drive;
 import frc.robot.subsystems.Intake;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Storage;
+import frc.robot.commands.*;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
@@ -138,12 +139,15 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
    */
   public Command getAutonomousCommand() {
     // Drive forward for 2 meters at half speed with a 3 second timeout
-    return m_drive
+    return AutoCommands.followToPoseViaWaypoint(m_drive); 
+  
+    //  return m_drive
     //     .turnToAngleCommand(190);}  
    //     .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)
    //     .withTimeout(AutoConstants.kTimeoutSeconds);
-   .forwardBackCommand(1, 1, 2, 2)
-   .withTimeout(AutoConstants.kTimeoutSeconds);}
+//   .forwardBackCommand(1, 1, 2, 2)
+//   .withTimeout(AutoConstants.kTimeoutSeconds);}
+  }
 
   public Drive getDrive() {
     return m_drive;

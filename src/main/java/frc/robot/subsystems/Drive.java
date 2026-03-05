@@ -3,6 +3,7 @@ package frc.robot.subsystems;
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.controller.LTVUnicycleController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import com.revrobotics.spark.SparkBase;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
@@ -49,6 +50,8 @@ import com.revrobotics.spark.SparkClosedLoopController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+
 
 @Logged
 public class Drive extends SubsystemBase {
@@ -142,6 +145,8 @@ public class Drive extends SubsystemBase {
   private SparkMaxConfig rightLeaderConfig;
   private SparkMaxConfig leftFollowerConfig;
   private SparkMaxConfig rightFollowerConfig;
+
+  private final LTVUnicycleController m_feedback = new LTVUnicycleController(0.020);
 
   public Drive() {
     // Construct vendor SparkMax motor controllers directly. The vendor-provided
@@ -685,9 +690,62 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
     return m_odometry.getPoseMeters();
   }
 
+  /**
+   * Expose the drivetrain kinematics so callers can reuse the same instance.
+   */
+  public DifferentialDriveKinematics getKinematics() {
+    return m_kinematics;
+  }
+
   /** Returns the current wheel speeds (meters per second). */
   public DifferentialDriveWheelSpeeds getWheelSpeeds() {
     return new DifferentialDriveWheelSpeeds(m_leftEncoder.getVelocity(), m_rightEncoder.getVelocity());
+  }
+
+  /**
+   * Set wheel speeds in meters per second using closed-loop velocity control on the motor controllers.
+   * This method will attempt to use the SparkMax closed-loop velocity setpoint API. If that fails,
+   * it will fall back to open-loop percent output as a best-effort.
+   */
+  public void setWheelSpeeds(DifferentialDriveWheelSpeeds speeds) {
+    double left = speeds.leftMetersPerSecond;
+    double right = speeds.rightMetersPerSecond;
+    try {
+      m_leftLeader.getClosedLoopController().setSetpoint(left, SparkBase.ControlType.kVelocity);
+      m_rightLeader.getClosedLoopController().setSetpoint(right, SparkBase.ControlType.kVelocity);
+    } catch (Throwable t) {
+      // Fallback: convert desired wheel speeds to percent of max speed and drive open-loop
+      try {
+        double leftPct = left / DriveConstants.kMaxSpeedMetersPerSecond;
+        double rightPct = right / DriveConstants.kMaxSpeedMetersPerSecond;
+        m_drive.tankDrive(leftPct, rightPct);
+      } catch (Throwable ignored) {}
+    }
+  }
+
+  /**
+   * Accept chassis speeds (vx, vy, omega) and command the drivetrain accordingly.
+   * This converts chassis speeds to wheel speeds using the subsystem's kinematics
+   * and delegates to {@link #setWheelSpeeds(DifferentialDriveWheelSpeeds)}.
+   */
+  public void setChassisSpeeds(ChassisSpeeds chassisSpeeds) {
+    try {
+      DifferentialDriveWheelSpeeds ws = m_kinematics.toWheelSpeeds(chassisSpeeds);
+      setWheelSpeeds(ws);
+    } catch (Throwable t) {
+      // If kinematics not available or conversion fails, attempt to stop as a safe fallback
+      try { stop(); } catch (Throwable ignored) {}
+    }
+  }
+
+  /** Stop the drivetrain (attempt closed-loop stop, otherwise open-loop stop). */
+  public void stop() {
+    try {
+      m_leftLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+      m_rightLeader.getClosedLoopController().setSetpoint(0.0, SparkBase.ControlType.kVelocity);
+    } catch (Throwable t) {
+      try { m_drive.stopMotor(); } catch (Throwable ignored) {}
+    }
   }
 
   /** Reset odometry to zero pose and zero the encoders. */
