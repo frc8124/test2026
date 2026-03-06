@@ -1,8 +1,6 @@
 package frc.robot.commands;
 
 import edu.wpi.first.math.controller.LTVUnicycleController;
-import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
-import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
 import edu.wpi.first.math.trajectory.TrajectoryGenerator;
@@ -34,8 +32,8 @@ public final class AutoCommands {
    */
   public static Command followStraight2m(Drive drive) {
     TrajectoryConfig config = new TrajectoryConfig(
-        DriveConstants.kMaxSpeedMetersPerSecond / 2.0,
-        DriveConstants.kMaxSpeedMetersPerSecond / 3.0)
+        DriveConstants.kMaxSpeedMetersPerSecond / 10.0,
+        DriveConstants.kMaxSpeedMetersPerSecond / 20.0)
         .setKinematics(drive.getKinematics());
 
     Supplier<Trajectory> supplier = () -> {
@@ -59,8 +57,8 @@ public final class AutoCommands {
 
     Supplier<Trajectory> supplier = () -> {
       Pose2d start = drive.getPose();
-      Translation2d waypoint = new Translation2d(3.0, 1.0);
-      Pose2d goal = new Pose2d(3.0, 4.0, new Rotation2d(0.0));
+      Translation2d waypoint = new Translation2d(1.25, -3);
+      Pose2d goal = new Pose2d(3.0, -5.0, new Rotation2d(0.0));
       return TrajectoryGenerator.generateTrajectory(start, List.of(waypoint), goal, config);
     };
 
@@ -80,7 +78,7 @@ public final class AutoCommands {
     return new FunctionalCommand(
         // initialize
         () -> {
-          drive.resetOdometry();
+         // drive.resetOdometry();
           trajHolder[0] = trajSupplier.get();
           timer.reset();
           timer.start();

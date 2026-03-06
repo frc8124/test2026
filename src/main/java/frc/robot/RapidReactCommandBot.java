@@ -20,10 +20,17 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.ConditionalCommand;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.ParallelRaceGroup;
 import edu.wpi.first.wpilibj2.command.RepeatCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj.Timer;
+import com.revrobotics.RelativeEncoder;
+import frc.robot.subsystems.Shooter;
+import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
  * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
@@ -82,29 +89,12 @@ private boolean forwardrotate = true;
     // Retract the intake with the Left trigger release
    // m_driverController.axisLessThan(2, 0.25).onTrue(m_intake.retractCommand());
 
-    // Fire the shooter with the right trigger
-   Command shootBall = 
-          sequence(
-            m_storage.stopCommand(),
-            m_shooter.speedupCommand(),
-                   
-            new ParallelRaceGroup(
-              m_shooter.shootCommand(),
-              m_storage.runCommand( false ).until( () -> m_shooter.ballInShooter() )
-            ),
-            m_storage.stopCommand(),
-            m_shooter.shootCommand().withTimeout(0.25)
-          )
-                // Since we composed this inline we should give it a name
-               .withName("Shoot");
-
-
 
      m_driverController
         .axisGreaterThan(3, 0.25) // Right trigger is axis 3, Left is axis 2.
-        .whileTrue( new RepeatCommand( shootBall ) );
+        .whileTrue( new RepeatCommand( shootBallCommand() ) );
 
-  
+
 m_driverController.axisGreaterThan(2, 0.25).whileTrue(
            parallel(
                     m_shooter.intakeCommand(),
@@ -123,8 +113,36 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
       m_shooter.stopCommand()
       ,m_storage.stopCommand()
       ));
+  m_driverController.x().onTrue(AutoCommands.followStraight2m(m_drive));
+
+
+
   }
 
+    // Fire the shooter with the right trigger
+    Command shootBallCommand() {
+      return sequence(
+            m_storage.stopCommand(),
+            m_shooter.speedupCommand(),
+             
+              new RepeatCommand( sequence(
+            new ParallelCommandGroup(
+              m_shooter.shootCommand(),
+              m_storage.runCommand( false ).until( () -> m_shooter.ballInShooter() )
+            ).onlyWhile( () -> !(m_shooter.faultPresent() || m_storage.faultPresent() ) ),
+
+            new ConditionalCommand(
+              m_storage.runCommand(true).withTimeout(1.5) ,
+              new InstantCommand( () -> {} ),
+              () -> { return m_shooter.faultPresent() ||  m_storage.faultPresent(); } ) 
+            ) ),
+
+            m_storage.stopCommand(),
+            m_shooter.shootCommand().withTimeout(0.25)
+          )
+                // Since we composed this inline we should give it a name
+               .withName("Shoot");
+    }
 
   /**
    * lized simulation step. Called from Robot.simulationPeriodic().
@@ -139,8 +157,13 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
    */
   public Command getAutonomousCommand() {
     // Drive forward for 2 meters at half speed with a 3 second timeout
-    return AutoCommands.followToPoseViaWaypoint(m_drive); 
+//    return AutoCommands.followToPoseViaWaypoint(m_drive); 
   
+    return sequence( m_drive.driveDistanceCommand(1.0, .3),
+      new InstantCommand( m_shooter::resetBallCount, m_shooter),
+      shootBallCommand().repeatedly().until( () -> m_shooter.getBallCount() > 7 )
+    ).withTimeout(20.0);
+
     //  return m_drive
     //     .turnToAngleCommand(190);}  
    //     .driveDistanceCommand(AutoConstants.kDriveDistanceMeters, AutoConstants.kDriveSpeed)

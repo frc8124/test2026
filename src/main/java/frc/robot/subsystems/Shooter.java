@@ -5,6 +5,7 @@
 package frc.robot.subsystems;
 
 import static edu.wpi.first.wpilibj2.command.Commands.parallel;
+import static edu.wpi.first.wpilibj2.command.Commands.sequence;
 import static edu.wpi.first.wpilibj2.command.Commands.waitUntil;
 
 import org.littletonrobotics.junction.Logger;
@@ -12,6 +13,8 @@ import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj.Timer;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.FeedbackSensor;
@@ -56,6 +59,8 @@ import com.revrobotics.spark.SparkLowLevel.MotorType;
 @Logged
 public class Shooter extends SubsystemBase {
 private boolean m_ballInShooter = false;
+private Boolean m_lastBallInShooter = false;
+private int m_ballCountDebounce = 0;
 
   public boolean ballInShooter() {
   return m_ballInShooter;
@@ -73,6 +78,10 @@ private boolean m_ballInShooter = false;
   private SparkMaxSim m_shooterSim = null;
   private static final double simStaticV = 0.004;
  
+  private int m_ballCount = 0;
+
+  private boolean m_faultPresent = false;
+
   private final SparkMaxConfig shooterMotorConfig = new SparkMaxConfig();
 
   // private SparkMax m_feederMotor;
@@ -164,8 +173,18 @@ private boolean m_ballInShooter = false;
                 })
             .withName("Idle"));
   }
+  
+public boolean faultPresent() {
+
+    return m_faultPresent; // m_shooterEncoder.getVelocity() < 100;
+ }
+
+ private void setFaultPresent() {
+  m_faultPresent = true;
+ }
+
 public Command stopCommand() {
-  return run (() -> {m_shooterMotor.disable();}).withName ("Stop");
+  return run (() -> {m_shooterMotor.disable(); }).withName ("Stop");
 }
 
 
@@ -176,15 +195,18 @@ public Command stopCommand() {
    *
    */
   public Command shootCommand() {
-    return // parallel(
-            // Run the shooter flywheel at the desired setpoint using feedforward and feedback
+    return sequence(
+            new InstantCommand( () -> { resetFault(); } ),       
+    // Run the shooter flywheel at the desired setpoint using feedforward and feedback
             run(
                 () -> {
                  m_shooterMotor.getClosedLoopController().setSetpoint(ShooterConstants.kTargetRPM,  SparkBase.ControlType.kVelocity);
                 //m_feederMotor.getClosedLoopController().setSetpoint(setpointRotationsPerSecondFeeder,  SparkBase.ControlType.kVelocity); //uncomment to add feeder motor back in
                 }
-            )
+            ).withTimeout(2.5)
+            .finallyDo( () -> { setFaultPresent(); } )
             // .until( () -> m_shooterMotor.getClosedLoopController().isAtSetpoint())
+    )
         .withName("Shoot");
 
         
@@ -236,11 +258,23 @@ public Command unloadCommand() {
       double rangeMM = m_rev2m.getRange(Rev2mDistanceSensor.Unit.kMillimeters);
 
       m_ballInShooter = (rangeMM < 300);
+      if (m_ballCountDebounce <= 0) {
+        if (m_ballInShooter && !m_lastBallInShooter) {
+          m_ballCount++;
+          m_ballCountDebounce = 3;
+        }
+      } else {
+        m_ballCountDebounce--;
+      }
+      m_lastBallInShooter = m_ballInShooter;
+
       SmartDashboard.putNumber("Shooter/Rev2mDistanceMM", rangeMM);
       Logger.recordOutput("Shooter/distance", rangeMM);
     } else {
       SmartDashboard.putNumber("Shooter/Rev2mDistanceMeters", Double.NaN);
     }
+      SmartDashboard.putBoolean("Shooter/fault", m_faultPresent);
+      SmartDashboard.putNumber("Shooter/ballCount", m_ballCount);
 
     
     
@@ -293,5 +327,18 @@ public Command unloadCommand() {
     // adjust the simulated battery voltage based on simulated current draw from the motor
     RoboRioSim.setVInVoltage(
       BatterySim.calculateDefaultBatteryLoadedVoltage( m_shooterMotor.getOutputCurrent()));
+  }
+
+  public int getBallCount() {
+    return m_ballCount;
+  }
+
+  public void resetBallCount() {
+    m_ballCount = 0;
+    m_ballCountDebounce = 0;    
+  }
+
+  private void resetFault() {
+    m_faultPresent = false;
   }
 }

@@ -207,7 +207,7 @@ public class Drive extends SubsystemBase {
       m_leftFollower.configure(leftFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
       m_rightLeader.configure(rightLeaderConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
       m_rightFollower.configure(rightFollowerConfig, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
-
+      
       // Note: follower targets were set on the config above; runtime follow
       // calls are optional and may not be available in all library versions.
     } catch (Throwable ignored) {}
@@ -266,8 +266,8 @@ public class Drive extends SubsystemBase {
         m_driveSim = new DifferentialDrivetrainSim(
             DCMotor.getNEO(2),       // 2 NEO motors on each side of the drivetrain.
     DriveConstants.kDriveGearReduction,                    // 7.29:1 gearing reduction.
-  7.5,                     // MOI of 7.5 kg m^2 (from CAD model).
-  40.0,                    // The mass of the robot is 60 kg.
+   5,                     // MOI of 7.5 kg m^2 (from CAD model).
+  30.0,                    // The mass of the robot is 60 kg.
   DriveConstants.kWheelDiameterMeters / 2.0, // The robot uses 3" radius wheels.
   DriveConstants.kTrackwidthMeters,                  // The track width is 0.7112 meters.
   // The standard deviations for measurement noise:
@@ -317,7 +317,6 @@ public class Drive extends SubsystemBase {
       }).withName("arcadeDrive");
     }
   }
-
   public Command tankDriveCommand(DoubleSupplier left, DoubleSupplier right) {
     return run(() -> {
       double lf = left.getAsDouble();

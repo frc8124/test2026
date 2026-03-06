@@ -56,7 +56,7 @@ public final class Constants {
 
     // Distance between left and right wheels (track width) for Andymark 2024 Kitbot
     // Approximate standard value in meters; tune for your robot.
-    public static final double kTrackwidthMeters = 0.69;
+    public static final double kTrackwidthMeters = Units.inchesToMeters(21.75);  //  0.69;
 
     // Drive motor velocity PID (used for internal SparkMax PID tuning)
     public static final double kDriveP = 0.1;
@@ -66,7 +66,7 @@ public final class Constants {
     public static final double kDriveFF = 0.0;
     // Gear reduction between motor and wheel (motor rotations per wheel rotation)
     // For example: an 8.46:1 reduction means 8.46 motor rotations = 1 wheel rotation
-    public static final double kDriveGearReduction = 8.46;
+    public static final double kDriveGearReduction = 8.0; //10.0;
 
   // Nominal free speed of the drive motor (NEO) in RPM. Used for simple sim.
   public static final double kMotorFreeSpeedRPM = 5676.0;

@@ -67,6 +67,12 @@ public class Storage extends SubsystemBase {
     setDefaultCommand(runOnce(m_storageMotor::disable).withName("Idle"));
   }
 
+  
+public boolean faultPresent() {
+
+    return false; // m_storageEncoder.getVelocity() < 100;
+ }
+
   /** Returns a command that runs the storage motor indefinitely. */
   public Command runCommand(boolean inwards) {
     if (inwards) {
