@@ -371,7 +371,7 @@ public Command driveThere(){
 return runOnce(() -> resetOdometry())
 .andThen(run(() ->{
 turn = MathUtil.clamp(pointAt * 0.02, -0.6, 0.6);
-arcadeDriveLogged( p, turn * 10, false);}
+arcadeDriveLogged( AutoConstants.speedIncrease, turn * AutoConstants.turnIncrease, false);}
 //arcadeDriveLogged( p, pointAt, false)
 ))
 .until (() -> goodEnough)
@@ -602,7 +602,7 @@ public static boolean goodEnough = false;
         m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
         pose = m_odometry.getPoseMeters();
       }
-       goodEnough = (pose.getX() < AutoConstants.X + 1) && (pose.getY() < AutoConstants.Y + 1) && (pose.getX() > AutoConstants.X - 1) && ( pose.getY()> AutoConstants.Y - 1); 
+       goodEnough = (pose.getX() < AutoConstants.X + AutoConstants.tolerence) && (pose.getY() < AutoConstants.Y + AutoConstants.tolerence) && (pose.getX() > AutoConstants.X - AutoConstants.tolerence) && ( pose.getY()> AutoConstants.Y - AutoConstants.tolerence); 
 
       Logger.recordOutput("drive/odometryPose", pose);
       SmartDashboard.putNumber("Drive/PoseX", pose.getX());

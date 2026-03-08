@@ -157,6 +157,9 @@ public static final Transform3d kRobotToLimelight =
     public static final double X = 3;
     public static final double Y = 4;
     public static final double rot = 0;
+    public static final double speedIncrease = 0.1;
+    public static final double turnIncrease = 10.0;
+    public static final double tolerence = 0.1;
   }
 
   public static final class OIConstants {
