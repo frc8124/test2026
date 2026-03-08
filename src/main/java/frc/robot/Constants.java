@@ -78,8 +78,8 @@ public final class Constants {
     (kMotorFreeSpeedRPM / kDriveGearReduction) / 60.0 * (Math.PI * kWheelDiameterMeters);
     // Slew-rate limiter rates (units: input units per second). These limit how
     // quickly joystick inputs can change. Tune to taste.
-    public static final double kSlewRateForward = 1.0; // per second
-    public static final double kSlewRateRotate = 1.0; // per second
+    public static final double kSlewRateForward = 0.75; // per second
+    public static final double kSlewRateRotate = 0.75; // per second
     // Allowed range for slew-rate limiter configuration
     public static final double kSlewMin = 0.0;
     public static final double kSlewMax = 1.0;
@@ -87,14 +87,14 @@ public final class Constants {
 public static final Transform3d kRobotToLimelight =
     new Transform3d(
         new Translation3d(
-            -0.2286,   // forward from robot center (meters)
-            0.03175,    // left (+) / right (-)
-            0.2286    // height (meters)
+            -0.3302,   // forward from robot center (meters)
+            0.0381,    // left (+) / right (-)
+            0.2159    // height (meters)
         ),
         new Rotation3d(
             0.0,                    // roll
-            Math.toRadians(32),     // pitch (camera tilted up 32°)
-            Math.toRadians(180)                     // yaw
+            Math.toRadians(33.15),     // pitch (camera tilted up 35°)
+            Math.toRadians(180)                     // yaw  
         )
     );
   public static final class ShooterConstants {
@@ -151,9 +151,12 @@ public static final Transform3d kRobotToLimelight =
   }
 
   public static final class AutoConstants {
-    public static final double kTimeoutSeconds = 6;
+    public static final double kTimeoutSeconds = 10;
     public static final double kDriveDistanceMeters = 2;
     public static final double kDriveSpeed = 0.5;
+    public static final double X = 3;
+    public static final double Y = 4;
+    public static final double rot = 0;
   }
 
   public static final class OIConstants {

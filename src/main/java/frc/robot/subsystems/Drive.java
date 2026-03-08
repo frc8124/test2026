@@ -2,6 +2,7 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.LTVUnicycleController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
@@ -11,6 +12,7 @@ import edu.wpi.first.util.sendable.SendableRegistry;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.LimelightHelpers;
 import com.revrobotics.spark.config.SparkMaxConfig;
@@ -23,6 +25,10 @@ import com.revrobotics.PersistMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+
+import static edu.wpi.first.wpilibj2.command.Commands.race;
+
 import java.util.function.DoubleConsumer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.DoubleSupplier;
@@ -74,11 +80,12 @@ public class Drive extends SubsystemBase {
   private final RelativeEncoder m_rightEncoder;
 
   // Creates a SlewRateLimiter that limits the rate of change of the signal to 0.5 units per second
-  private SlewRateLimiter filter = new SlewRateLimiter(0.5);
-  private SlewRateLimiter filter2 = new SlewRateLimiter(1.0);
 
   private double slewLimit1 = 0.5;
   private double slewLimit2 = 1.0;
+  private SlewRateLimiter filter = new SlewRateLimiter(slewLimit1);
+  private SlewRateLimiter filter2 = new SlewRateLimiter(slewLimit2);
+
 
   private boolean usePidReference = false;
 //  private final RelativeEncoder m_leftEncoder;
@@ -358,6 +365,19 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
 .finallyDo(interrupted -> m_drive.stopMotor());
 
 }
+double turn = 0;
+double p = 0.1;
+public Command driveThere(){
+return runOnce(() -> resetOdometry())
+.andThen(run(() ->{
+turn = MathUtil.clamp(pointAt * 0.02, -0.6, 0.6);
+arcadeDriveLogged( p, turn * 10, false);}
+//arcadeDriveLogged( p, pointAt, false)
+))
+.until (() -> goodEnough)
+//.andThen(run(() ->arcadeDriveLogged(((forwarddistance - backdistance) - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * backSpeed,  0, false)))
+//.until(() -> ((Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) <= (forwarddistance - backdistance)))
+.finallyDo(interrupted -> m_drive.stopMotor());}
 
 
  private void arcadeDriveLogged(double f, double r, boolean sq) {
@@ -366,7 +386,17 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
   Logger.recordOutput("drive/arcadeSq",sq);
   m_drive.arcadeDrive(f, r, sq);
  }
+public Command disableCommand()  {
 
+      return runOnce(
+            () -> {
+              try { m_leftEncoder.setPosition(0); } catch (Throwable ignored) {}
+              try { m_rightEncoder.setPosition(0); } catch (Throwable ignored) {}
+            })
+        .andThen(run(() -> m_drive.arcadeDrive(0, 0))
+)
+        .finallyDo(interrupted -> m_drive.stopMotor());
+};
   public Command turnToAngleCommand(double angleDeg) {
     return startRun(
             () -> m_controller.reset(m_gyro.getRotation2d().getDegrees()),
@@ -409,7 +439,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
     try { return s.get(); } catch (Throwable t) { return 0.0; }
   }
 
-  
+public static boolean goodEnough = false;  
 
   public double getSlewForward() { return slewLimit1; }
   public double getSlewRotate() { return slewLimit2; }
@@ -431,7 +461,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
   public boolean isCurveDrive() { return this.curveDrive; }
   public void setUsePidReference(boolean use) { this.usePidReference = use; }
   public boolean isUsePidReference() { return this.usePidReference; }
-
+  public static double pointAt = 0; 
   public double getDriveP() { return this.driveP; }
   public void setDriveP(double p) { this.driveP = p; applyDriveClosedLoopConfig(); }
   public double getDriveI() { return this.driveI; }
@@ -519,8 +549,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
   @Override
   public void periodic() {
 
-
-    Logger.recordOutput("drive/leftEncoderPosition", m_leftEncoder.getPosition());
+   Logger.recordOutput("drive/leftEncoderPosition", m_leftEncoder.getPosition());
     Logger.recordOutput("drive/rightEncoderPosition", m_rightEncoder.getPosition());
     try {
       // Encoders are configured to return meters and meters/second
@@ -566,12 +595,14 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
           pose = null;
         }
       }
-
+      double robotAngle = pose.getRotation().getRadians();
+      pointAt = -MathUtil.angleModulus( Math.atan2(AutoConstants.Y - pose.getY() , AutoConstants.X - pose.getX()) - robotAngle);      
       if (pose == null) {
         // Fallback to raw odometry if estimator isn't available or didn't return a pose
         m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
         pose = m_odometry.getPoseMeters();
       }
+       goodEnough = (pose.getX() < AutoConstants.X + 1) && (pose.getY() < AutoConstants.Y + 1) && (pose.getX() > AutoConstants.X - 1) && ( pose.getY()> AutoConstants.Y - 1); 
 
       Logger.recordOutput("drive/odometryPose", pose);
       SmartDashboard.putNumber("Drive/PoseX", pose.getX());
@@ -586,6 +617,7 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
     } catch (Throwable t) {
       // ignore
     }
+
   }
 
   @Override

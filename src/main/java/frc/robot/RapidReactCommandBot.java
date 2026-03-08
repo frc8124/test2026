@@ -30,6 +30,7 @@ import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj.Timer;
 import com.revrobotics.RelativeEncoder;
 import frc.robot.subsystems.Shooter;
+import frc.robot.commands.AutoCommands;
 import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -45,6 +46,7 @@ public class RapidReactCommandBot {
   private final Storage m_storage = new Storage();
  private final Shooter m_shooter = new Shooter();
 private boolean forwardrotate = true; 
+public boolean firstStep = false;
   // The driver's controller
   CommandXboxController m_driverController =
       new CommandXboxController(OIConstants.kDriverControllerPort);
@@ -113,9 +115,10 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
       m_shooter.stopCommand()
       ,m_storage.stopCommand()
       ));
-  m_driverController.x().onTrue(AutoCommands.followStraight2m(m_drive));
+  m_driverController.x().onTrue( sequence(AutoCommands.followStraight2m(m_drive), m_drive.turnToAngleCommand(AutoConstants.rot).withTimeout(3)));
+  
 
-
+  
 
   }
 
@@ -159,7 +162,12 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
     // Drive forward for 2 meters at half speed with a 3 second timeout
 //    return AutoCommands.followToPoseViaWaypoint(m_drive); 
   
-    return sequence( m_drive.driveDistanceCommand(1.0, .3),
+    return sequence( 
+     // m_drive.driveDistanceCommand(1.2, .3),
+      
+      m_drive.driveThere(),
+      
+      m_drive.turnToAngleCommand(AutoConstants.rot),
       new InstantCommand( m_shooter::resetBallCount, m_shooter),
       shootBallCommand().repeatedly().until( () -> m_shooter.getBallCount() > 7 )
     ).withTimeout(20.0);
