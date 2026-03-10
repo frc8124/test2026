@@ -85,8 +85,8 @@ public class Drive extends SubsystemBase {
   private double slewLimit2 = 1.0;
   private SlewRateLimiter filter = new SlewRateLimiter(slewLimit1);
   private SlewRateLimiter filter2 = new SlewRateLimiter(slewLimit2);
-
-
+  boolean extra = false;
+  double differenceIn = 0.0;
   private boolean usePidReference = false;
 //  private final RelativeEncoder m_leftEncoder;
 //  private final RelativeEncoder m_rightEncoder;
@@ -99,6 +99,7 @@ public class Drive extends SubsystemBase {
   private double m_simRightPosition = 0.0; // meters
   private double m_simHeading = 0.0; // radians
   private double m_lastSimTimestamp = 0.0;
+  boolean done = false; 
   // WPILib drivetrain simulator (not constructed here to avoid cross-version
   // constructor mismatches). If available in the environment, this can be
   // created and used; for now we keep the simple integrator fallback.
@@ -126,7 +127,7 @@ public class Drive extends SubsystemBase {
 */
 
   private final ADXRS450_Gyro m_gyro = new ADXRS450_Gyro();
-
+double turn = 0;
   private final ProfiledPIDController m_controller =
       new ProfiledPIDController(
           DriveConstants.kTurnP,
@@ -365,16 +366,17 @@ arcadeDriveLogged( (forwarddistance - Math.max(safeGet(m_leftEncoder::getPositio
 .finallyDo(interrupted -> m_drive.stopMotor());
 
 }
-double turn = 0;
+
 double p = 0.1;
 public Command driveThere(){
-return runOnce(() -> resetOdometry())
-.andThen(run(() ->{
-turn = MathUtil.clamp(pointAt * 0.02, -0.6, 0.6);
-arcadeDriveLogged( AutoConstants.speedIncrease, turn * AutoConstants.turnIncrease, false);}
+return (run(() ->{
+
+arcadeDriveLogged( -AutoConstants.speedIncrease * differenceIn, turn * AutoConstants.turnIncrease, false);
 //arcadeDriveLogged( p, pointAt, false)
+ done = false;}
 ))
 .until (() -> goodEnough)
+.andThen(() -> done = true )
 //.andThen(run(() ->arcadeDriveLogged(((forwarddistance - backdistance) - Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) * backSpeed,  0, false)))
 //.until(() -> ((Math.max(safeGet(m_leftEncoder::getPosition), safeGet(m_rightEncoder::getPosition))) <= (forwarddistance - backdistance)))
 .finallyDo(interrupted -> m_drive.stopMotor());}
@@ -411,7 +413,7 @@ public Command disableCommand()  {
               // encoder velocity conversion factor. We configured the encoder
               // velocityConversionFactor to return meters/second, so pass the
               // wheel linear speed (m/s) directly.
-              double leftTargetMps = -wheelLinearSpeedMPerS;
+             /*  double leftTargetMps = -wheelLinearSpeedMPerS;
               double rightTargetMps = wheelLinearSpeedMPerS;
 
               try {
@@ -419,9 +421,9 @@ public Command disableCommand()  {
                     leftTargetMps, SparkBase.ControlType.kVelocity);
                 m_rightLeader.getClosedLoopController().setSetpoint(
                     rightTargetMps, SparkBase.ControlType.kVelocity);
-              } catch (Throwable t) {
+              } catch (Throwable t) {*/
                 m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg));
-              }
+              //}
             })
         .until(m_controller::atGoal)
         .finallyDo(() -> {
@@ -548,11 +550,19 @@ public static boolean goodEnough = false;
 
   @Override
   public void periodic() {
-
+turn = MathUtil.clamp(pointAt * 0.1, -1, 1);
    Logger.recordOutput("drive/leftEncoderPosition", m_leftEncoder.getPosition());
     Logger.recordOutput("drive/rightEncoderPosition", m_rightEncoder.getPosition());
     try {
+      SmartDashboard.putBoolean("drive/DoneWithAuto1step", done);
+      SmartDashboard.putNumber("drive/pointAt", pointAt);
+      SmartDashboard.putNumber("drive/turn", turn);
+      SmartDashboard.putBoolean("drive/extraBoostTurning", extra);
+    }
+      catch (Throwable t ){}
+    try {
       // Encoders are configured to return meters and meters/second
+
       SmartDashboard.putNumber("Drive/LeftEncoderPositionMeters", m_leftEncoder.getPosition());
       SmartDashboard.putNumber("Drive/LeftEncoderVelocityMPS", m_leftEncoder.getVelocity());
 
@@ -596,7 +606,14 @@ public static boolean goodEnough = false;
         }
       }
       double robotAngle = pose.getRotation().getRadians();
-      pointAt = -MathUtil.angleModulus( Math.atan2(AutoConstants.Y - pose.getY() , AutoConstants.X - pose.getX()) - robotAngle);      
+      pointAt = -MathUtil.angleModulus( Math.atan2(  AutoConstants.Y - pose.getY(),  AutoConstants.X - pose.getX()) - robotAngle + Math.PI);
+      /* 
+      if ( (Math.atan(AutoConstants.Y - pose.getY() /  AutoConstants.X - pose.getX()) - ((robotAngle / Math.PI)*180) > 90 || Math.atan(AutoConstants.Y - pose.getY() /  AutoConstants.X - pose.getX()) - ((robotAngle / Math.PI)*180) < -90 )){
+        extra = true;
+        pointAt = pointAt*10;
+        //pointAt = pointAt + MathUtil.angleModulus( Math.atan(  AutoConstants.Y - pose.getY() /  AutoConstants.X - pose.getX() + (0.5 * Math.PI)) - robotAngle);
+      } */
+      differenceIn = Math.sqrt(((AutoConstants.Y - pose.getY())*(AutoConstants.Y - pose.getY())) + ((AutoConstants.X - pose.getX())*(AutoConstants.X - pose.getX())) ) ;    
       if (pose == null) {
         // Fallback to raw odometry if estimator isn't available or didn't return a pose
         m_odometry.update(m_gyro.getRotation2d(), m_leftEncoder.getPosition(), m_rightEncoder.getPosition());
@@ -799,5 +816,23 @@ public static boolean goodEnough = false;
       // ignore
     }
   }
+  public void resetOdometryToStart() {
+    try {      
+      m_leftEncoder.setPosition(0);
+      m_rightEncoder.setPosition(0);
+      m_gyro.reset();
+      // Reset odometry by recreating the object with zeroed distances
+      m_odometry = new DifferentialDriveOdometry(m_gyro.getRotation2d(), AutoConstants.startX, AutoConstants.startY);
+      // Reset the pose estimator (if present) to agree with the newly-reset odometry
+      try {
+        if (poseEstimator != null) poseEstimator.resetPosition(m_gyro.getRotation2d(), AutoConstants.startX, AutoConstants.startY, m_odometry.getPoseMeters());
+      } catch (Throwable ignored) {}
 
+      m_driveSim.setPose( m_odometry.getPoseMeters());
+      
+    
+    } catch (Throwable t) {
+      // ignore
+    }
+  }
 }

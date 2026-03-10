@@ -115,7 +115,7 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
       m_shooter.stopCommand()
       ,m_storage.stopCommand()
       ));
-  m_driverController.x().onTrue( sequence(AutoCommands.followStraight2m(m_drive), m_drive.turnToAngleCommand(AutoConstants.rot).withTimeout(3)));
+  m_driverController.x().onTrue( sequence(m_drive.driveThere().withTimeout(4), m_drive.turnToAngleCommand(AutoConstants.rot).withTimeout(3)));
   
 
   
@@ -163,7 +163,8 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
 //    return AutoCommands.followToPoseViaWaypoint(m_drive); 
   
     return sequence( 
-     // m_drive.driveDistanceCommand(1.2, .3),
+
+    // m_drive.driveDistanceCommand(1.2, .3),
       
       m_drive.driveThere(),
       

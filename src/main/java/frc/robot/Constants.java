@@ -154,12 +154,14 @@ public static final Transform3d kRobotToLimelight =
     public static final double kTimeoutSeconds = 10;
     public static final double kDriveDistanceMeters = 2;
     public static final double kDriveSpeed = 0.5;
-    public static final double X = 3;
-    public static final double Y = 4;
-    public static final double rot = 0;
+    public static final double X = 13; //4 for blue, 13 for red
+    public static final double Y = 4; //always 4
+    public static final double rot = 180; //0 for blue, 180 for red
     public static final double speedIncrease = 0.1;
-    public static final double turnIncrease = 10.0;
+    public static final double turnIncrease = 1.0;
     public static final double tolerence = 0.1;
+    public static final double startX = 4;
+    public static final double startY = 2;
   }
 
   public static final class OIConstants {
