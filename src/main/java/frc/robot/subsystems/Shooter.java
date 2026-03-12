@@ -212,6 +212,29 @@ public Command stopCommand() {
         
  //    );
   }
+
+
+public Command unstickCommand() {
+    return sequence(
+            new InstantCommand( () -> { resetFault(); } ),       
+    // Run the shooter flywheel at the desired setpoint using feedforward and feedback
+            run(
+                () -> {
+                 m_shooterMotor.set(1);
+                }
+            ).withTimeout(1.0),
+ //run(
+ //               () -> {
+ //                m_shooterMotor.set(-1.0);
+ //               }
+ //          ).withTimeout(1.0),
+          runOnce( () -> { m_shooterMotor.disable(); } )
+    )
+        .withName("Unstick");
+        
+ //    );
+  }
+
 public Command unloadCommand() {
   return 
     run(

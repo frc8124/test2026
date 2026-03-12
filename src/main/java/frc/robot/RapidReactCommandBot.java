@@ -117,7 +117,7 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
       ));
   m_driverController.x().onTrue( sequence(m_drive.driveThere().withTimeout(4), m_drive.turnToAngleCommand(AutoConstants.rot).withTimeout(3)));
   
-
+m_driverController.b().whileTrue( m_shooter.unstickCommand() );
   
 
   }
@@ -171,7 +171,7 @@ m_driverController.axisGreaterThan(2, 0.25).whileTrue(
       m_drive.turnToAngleCommand(AutoConstants.rot),
       new InstantCommand( m_shooter::resetBallCount, m_shooter),
       shootBallCommand().repeatedly().until( () -> m_shooter.getBallCount() > 7 )
-    ).withTimeout(20.0);
+    ).withTimeout(10000);
 
     //  return m_drive
     //     .turnToAngleCommand(190);}  

@@ -162,6 +162,8 @@ public static final Transform3d kRobotToLimelight =
     public static final double tolerence = 0.1;
     public static final double startX = 4;
     public static final double startY = 2;
+    public static final double maxSpeed = 0.5;
+    public static final double toCloseTolerence = 0.05;
   }
 
   public static final class OIConstants {

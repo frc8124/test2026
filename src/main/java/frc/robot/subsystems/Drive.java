@@ -371,7 +371,7 @@ double p = 0.1;
 public Command driveThere(){
 return (run(() ->{
 
-arcadeDriveLogged( -AutoConstants.speedIncrease * differenceIn, turn * AutoConstants.turnIncrease, false);
+arcadeDriveLogged( -(Math.min(AutoConstants.speedIncrease*differenceIn, AutoConstants.maxSpeed) + AutoConstants.toCloseTolerence),turn * AutoConstants.turnIncrease, false);
 //arcadeDriveLogged( p, pointAt, false)
  done = false;}
 ))
@@ -388,6 +388,7 @@ arcadeDriveLogged( -AutoConstants.speedIncrease * differenceIn, turn * AutoConst
   Logger.recordOutput("drive/arcadeSq",sq);
   m_drive.arcadeDrive(f, r, sq);
  }
+
 public Command disableCommand()  {
 
       return runOnce(
@@ -408,7 +409,7 @@ public Command disableCommand()  {
               double omegaRadPerS = angularSetpointDegPerS * Math.PI / 180.0;
               double halfTrack = DriveConstants.kTrackwidthMeters / 2.0;
               double wheelLinearSpeedMPerS = omegaRadPerS * halfTrack;
-
+            
               // SparkMax closed-loop velocity control expects the same units as the
               // encoder velocity conversion factor. We configured the encoder
               // velocityConversionFactor to return meters/second, so pass the
@@ -422,7 +423,7 @@ public Command disableCommand()  {
                 m_rightLeader.getClosedLoopController().setSetpoint(
                     rightTargetMps, SparkBase.ControlType.kVelocity);
               } catch (Throwable t) {*/
-                m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg));
+                m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg) / ((100 * Math.abs(currentAngle - angleDeg))));
               //}
             })
         .until(m_controller::atGoal)
