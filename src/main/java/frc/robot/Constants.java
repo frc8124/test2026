@@ -93,7 +93,7 @@ public static final Transform3d kRobotToLimelight =
         ),
         new Rotation3d(
             0.0,                    // roll
-            Math.toRadians(33.15),     // pitch (camera tilted up 35°)
+            Math.toRadians(21.6),     // pitch (camera tilted up 21.6°)
             Math.toRadians(180)                     // yaw  
         )
     );
