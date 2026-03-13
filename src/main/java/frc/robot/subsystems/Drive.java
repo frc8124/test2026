@@ -414,7 +414,7 @@ public Command disableCommand()  {
               // encoder velocity conversion factor. We configured the encoder
               // velocityConversionFactor to return meters/second, so pass the
               // wheel linear speed (m/s) directly.
-             /*  double leftTargetMps = -wheelLinearSpeedMPerS;
+              double leftTargetMps = -wheelLinearSpeedMPerS;
               double rightTargetMps = wheelLinearSpeedMPerS;
 
               try {
@@ -422,9 +422,9 @@ public Command disableCommand()  {
                     leftTargetMps, SparkBase.ControlType.kVelocity);
                 m_rightLeader.getClosedLoopController().setSetpoint(
                     rightTargetMps, SparkBase.ControlType.kVelocity);
-              } catch (Throwable t) {*/
-                m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg) / ((100 * Math.abs(currentAngle - angleDeg))));
-              //}
+              } catch (Throwable t) {
+                m_drive.arcadeDrive(0, m_controller.calculate(currentAngle, angleDeg) * ((0.00002 * Math.abs(angleDeg - currentAngle))));
+              }
             })
         .until(m_controller::atGoal)
         .finallyDo(() -> {
